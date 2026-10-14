@@ -1,0 +1,16 @@
+[package]
+name = "reforestation"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "reforestation"
+path = "src/lib.rs"
+
+[[bin]]
+name = "simulation"
+path = "src/bin/simulation.rs"
+
+[[bin]]
+name = "writer"
+path = "src/bin/writer.rs"

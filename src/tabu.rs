@@ -45,7 +45,8 @@ struct CountBand {
 
 #[derive(Clone, Debug)]
 pub struct Allocation {
-    pub dimension: usize,
+    pub width: usize,
+    pub height: usize,
     pub coords: Vec<HexCoord>,
     pub initial_species: Vec<Option<usize>>,
     pub initial_counts: Vec<usize>,
@@ -86,12 +87,10 @@ impl Allocation {
     }
 
     fn grid_string_for(&self, species: &[Option<usize>]) -> String {
-        let mut grid = vec![vec![None::<usize>; self.dimension]; self.dimension];
+        let mut grid = vec![vec![None::<usize>; self.width]; self.height];
         for (index, coord) in self.coords.iter().enumerate() {
             let (col, row) = coord.to_offset();
-            if (0..self.dimension as i32).contains(&col)
-                && (0..self.dimension as i32).contains(&row)
-            {
+            if (0..self.width as i32).contains(&col) && (0..self.height as i32).contains(&row) {
                 grid[row as usize][col as usize] = species[index];
             }
         }
@@ -123,8 +122,8 @@ impl fmt::Display for Allocation {
         write!(
             formatter,
             "grid {}x{} | target {} band [{}..{}] | placed {} | eco {:.2} -> {:.2} ({:.1}%) | iters {} | improved {} | tabu-hits {} | $/ha {:.0} (budget {:.0}) {}",
-            self.dimension,
-            self.dimension,
+            self.width,
+            self.height,
             self.target.iter().sum::<usize>(),
             self.min_counts.iter().sum::<usize>(),
             self.max_counts.iter().sum::<usize>(),
@@ -151,7 +150,8 @@ pub struct TabuSearch<'a> {
     adjacency: Vec<Vec<(usize, i32)>>,
     config: TabuConfig,
     row_sequence: Vec<usize>,
-    plants_per_hectare: f64,
+    width: usize,
+    height: usize,
 }
 
 impl<'a> TabuSearch<'a> {
@@ -161,7 +161,7 @@ impl<'a> TabuSearch<'a> {
             .map(|plant| plant.get_per_hectare() as f64)
             .sum();
         let dimension = map_dimension(polygon.get_area_hectare(), plants_per_hectare);
-        let coords = Self::plantable_coords(dimension);
+        let coords = Self::plantable_coords(dimension, dimension);
 
         let competition = get_competition_matrix(plants);
         let interaction = get_ecological_interaction_matrix(plants);
@@ -171,8 +171,39 @@ impl<'a> TabuSearch<'a> {
             .iter()
             .map(|plant| plant.get_root_spread_radius())
             .collect();
-        let max_radius = radii.iter().copied().max().unwrap_or(0);
+        let adjacency = Self::build_adjacency(&coords, &radii);
 
+        TabuSearch {
+            plants,
+            area_hectare: polygon.get_area_hectare(),
+            penalty,
+            radii,
+            coords,
+            adjacency,
+            config,
+            row_sequence: Vec::new(),
+            width: dimension,
+            height: dimension,
+        }
+    }
+
+    pub fn with_row_sequence(mut self, sequence: Vec<usize>) -> Self {
+        self.row_sequence = sequence;
+        self
+    }
+
+    pub fn with_dimensions(mut self, width: usize, height: usize) -> Self {
+        let width = width.max(1);
+        let height = height.max(1);
+        self.width = width;
+        self.height = height;
+        self.coords = Self::plantable_coords(width, height);
+        self.adjacency = Self::build_adjacency(&self.coords, &self.radii);
+        self
+    }
+
+    fn build_adjacency(coords: &[HexCoord], radii: &[i32]) -> Vec<Vec<(usize, i32)>> {
+        let max_radius = radii.iter().copied().max().unwrap_or(0);
         let index_of: HashMap<HexCoord, usize> = coords
             .iter()
             .enumerate()
@@ -190,29 +221,13 @@ impl<'a> TabuSearch<'a> {
                 }
             }
         }
-
-        TabuSearch {
-            plants,
-            area_hectare: polygon.get_area_hectare(),
-            penalty,
-            radii,
-            coords,
-            adjacency,
-            config,
-            row_sequence: Vec::new(),
-            plants_per_hectare,
-        }
+        adjacency
     }
 
-    pub fn with_row_sequence(mut self, sequence: Vec<usize>) -> Self {
-        self.row_sequence = sequence;
-        self
-    }
-
-    fn plantable_coords(dimension: usize) -> Vec<HexCoord> {
-        let mut coords = Vec::with_capacity(dimension * dimension);
-        for row in 0..dimension {
-            for col in 0..dimension {
+    fn plantable_coords(width: usize, height: usize) -> Vec<HexCoord> {
+        let mut coords = Vec::with_capacity(width * height);
+        for row in 0..height {
+            for col in 0..width {
                 coords.push(HexCoord::from_offset(col as i32, row as i32));
             }
         }
@@ -292,7 +307,8 @@ impl<'a> TabuSearch<'a> {
     }
 
     pub fn solve_with_budget(&self, budget_per_hectare: f64) -> Allocation {
-        let dimension = map_dimension(self.area_hectare, self.plants_per_hectare);
+        let width = self.width;
+        let height = self.height;
         let capacity = self.coords.len();
         let plant_count = self.plants.len();
         let band = self.count_band();
@@ -352,14 +368,14 @@ impl<'a> TabuSearch<'a> {
                 sequence
             };
             let mut sequence_index = 0;
-            for row in 0..dimension {
+            for row in 0..height {
                 let cols: Box<dyn Iterator<Item = usize>> = if row % 2 == 0 {
-                    Box::new(0..dimension)
+                    Box::new(0..width)
                 } else {
-                    Box::new((0..dimension).rev())
+                    Box::new((0..width).rev())
                 };
                 for col in cols {
-                    let cell = row * dimension + col;
+                    let cell = row * width + col;
                     let species_index = sequence[sequence_index % sequence.len()];
                     sequence_index += 1;
                     species[cell] = species_index as i32;
@@ -523,7 +539,8 @@ impl<'a> TabuSearch<'a> {
         };
 
         Allocation {
-            dimension,
+            width,
+            height,
             coords: self.coords.clone(),
             initial_species,
             initial_counts,
@@ -663,16 +680,16 @@ mod tests {
             .with_row_sequence(sequence.clone())
             .solve();
 
-        let dimension = allocation.dimension;
+        let width = allocation.width;
         let mut position = 0;
-        for row in 0..dimension {
+        for row in 0..allocation.height {
             let cols: Vec<usize> = if row % 2 == 0 {
-                (0..dimension).collect()
+                (0..width).collect()
             } else {
-                (0..dimension).rev().collect()
+                (0..width).rev().collect()
             };
             for col in cols {
-                let cell = row * dimension + col;
+                let cell = row * width + col;
                 assert_eq!(
                     allocation.initial_species[cell],
                     Some(sequence[position % sequence.len()])
@@ -692,6 +709,26 @@ mod tests {
 
         assert!(allocation.species.iter().all(|species| species.is_some()));
         assert_eq!(allocation.placed(), allocation.coords.len());
+    }
+
+    #[test]
+    fn custom_dimensions_override_grid_shape() {
+        let plants = plants();
+        let density: f64 = plants
+            .iter()
+            .map(|plant| plant.get_per_hectare() as f64)
+            .sum();
+        let area = (7.0 * 5.0) / density;
+        let polygon = Polygon::new("Custom", area, vec![0, 0, 0]);
+        let allocation = TabuSearch::new(&plants, &polygon, TabuConfig::default())
+            .with_dimensions(7, 5)
+            .with_row_sequence(vec![0, 1, 2])
+            .solve();
+
+        assert_eq!((allocation.width, allocation.height), (7, 5));
+        assert_eq!(allocation.coords.len(), 35);
+        assert_eq!(allocation.placed(), 35);
+        assert!(allocation.meets_requirements());
     }
 
     #[test]

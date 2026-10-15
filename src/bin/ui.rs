@@ -56,6 +56,8 @@ struct App {
     receiver: Option<Receiver<(usize, Allocation)>>,
     pending: usize,
     status: String,
+    custom_width: usize,
+    custom_height: usize,
 }
 
 impl App {
@@ -63,7 +65,8 @@ impl App {
         let plants = read_plants_file("bins/plants.bin");
         let polygons = read_polygons_file("bins/polygons.bin");
         let visible = vec![true; plants.len()];
-        let allocations = vec![None; polygons.len()];
+        let entries = polygons.len() + 1;
+        let allocations = vec![None; entries];
 
         let mut app = App {
             plants,
@@ -78,19 +81,57 @@ impl App {
             receiver: None,
             pending: 0,
             status: "Press \"Run selected\" to optimize the highlighted polygon.".to_string(),
+            custom_width: 30,
+            custom_height: 30,
         };
         app.run_selected();
         app
     }
 
+    fn entry_count(&self) -> usize {
+        self.polygons.len() + 1
+    }
+
+    fn is_custom(&self, index: usize) -> bool {
+        index >= self.polygons.len()
+    }
+
+    fn custom_density(&self) -> f64 {
+        self.plants
+            .iter()
+            .map(|plant| plant.get_per_hectare() as f64)
+            .sum()
+    }
+
+    fn custom_polygon(&self) -> Polygon {
+        let density = self.custom_density();
+        let area = if density > 0.0 {
+            (self.custom_width * self.custom_height) as f64 / density
+        } else {
+            0.0
+        };
+        Polygon::new("Custom", area, vec![0i32; self.plants.len()])
+    }
+
+    fn entry_polygon(&self, index: usize) -> Polygon {
+        if self.is_custom(index) {
+            self.custom_polygon()
+        } else {
+            self.polygons[index].clone()
+        }
+    }
+
     fn run_selected(&mut self) {
-        if self.polygons.is_empty() {
+        if self.entry_count() == 0 {
             return;
         }
-        let polygon = &self.polygons[self.selected];
-        let allocation = TabuSearch::new(&self.plants, polygon, self.config)
-            .with_row_sequence(ROW_SEQUENCE.to_vec())
-            .solve();
+        let polygon = self.entry_polygon(self.selected);
+        let mut search = TabuSearch::new(&self.plants, &polygon, self.config)
+            .with_row_sequence(ROW_SEQUENCE.to_vec());
+        if self.is_custom(self.selected) {
+            search = search.with_dimensions(self.custom_width, self.custom_height);
+        }
+        let allocation = search.solve();
         self.status = format!(
             "{} optimized: eco {:.2}, $/ha {:.0}",
             polygon.get_polygon_id(),
@@ -101,24 +142,37 @@ impl App {
     }
 
     fn run_all(&mut self) {
-        if self.polygons.is_empty() || self.receiver.is_some() {
+        if self.entry_count() == 0 || self.receiver.is_some() {
             return;
         }
+        let entries = self.entry_count();
         let plants = self.plants.clone();
-        let polygons = self.polygons.clone();
         let config = self.config;
+        let jobs: Vec<(Polygon, Option<(usize, usize)>)> = (0..entries)
+            .map(|index| {
+                let dims = if self.is_custom(index) {
+                    Some((self.custom_width, self.custom_height))
+                } else {
+                    None
+                };
+                (self.entry_polygon(index), dims)
+            })
+            .collect();
         let (sender, receiver) = mpsc::channel();
 
         self.receiver = Some(receiver);
-        self.pending = polygons.len();
-        self.allocations = vec![None; polygons.len()];
+        self.pending = entries;
+        self.allocations = vec![None; entries];
         self.status = "Solving all polygons...".to_string();
 
         thread::spawn(move || {
-            for (index, polygon) in polygons.iter().enumerate() {
-                let allocation = TabuSearch::new(&plants, polygon, config)
-                    .with_row_sequence(ROW_SEQUENCE.to_vec())
-                    .solve();
+            for (index, (polygon, dims)) in jobs.into_iter().enumerate() {
+                let mut search = TabuSearch::new(&plants, &polygon, config)
+                    .with_row_sequence(ROW_SEQUENCE.to_vec());
+                if let Some((width, height)) = dims {
+                    search = search.with_dimensions(width, height);
+                }
+                let allocation = search.solve();
                 if sender.send((index, allocation)).is_err() {
                     break;
                 }
@@ -181,23 +235,36 @@ impl App {
         ui.label(&self.status);
         ui.separator();
 
+        let entries: Vec<String> = (0..self.entry_count())
+            .map(|index| {
+                let done = if self.allocations[index].is_some() {
+                    " [ok]"
+                } else {
+                    ""
+                };
+                if self.is_custom(index) {
+                    format!(
+                        "Custom ({}x{}){}",
+                        self.custom_width, self.custom_height, done
+                    )
+                } else {
+                    let polygon = &self.polygons[index];
+                    format!(
+                        "{} ({:.2} ha){}",
+                        polygon.get_polygon_id(),
+                        polygon.get_area_hectare(),
+                        done
+                    )
+                }
+            })
+            .collect();
+
         ui.label("Polygons");
         egui::ScrollArea::vertical()
             .id_salt("polygon_list")
             .max_height(200.0)
             .show(ui, |ui| {
-                for (index, polygon) in self.polygons.iter().enumerate() {
-                    let done = if self.allocations[index].is_some() {
-                        " [ok]"
-                    } else {
-                        ""
-                    };
-                    let text = format!(
-                        "{} ({:.2} ha){}",
-                        polygon.get_polygon_id(),
-                        polygon.get_area_hectare(),
-                        done
-                    );
+                for (index, text) in entries.iter().enumerate() {
                     if ui.selectable_label(self.selected == index, text).clicked() {
                         self.selected = index;
                         self.hovered = None;
@@ -205,6 +272,36 @@ impl App {
                     }
                 }
             });
+
+        if self.is_custom(self.selected) {
+            ui.separator();
+            ui.label("Custom polygon dimensions");
+            let mut changed = false;
+            ui.horizontal(|ui| {
+                ui.label("width");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut self.custom_width).range(1..=300))
+                    .changed();
+                ui.label("height");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut self.custom_height).range(1..=300))
+                    .changed();
+            });
+            let cells = self.custom_width * self.custom_height;
+            let density = self.custom_density();
+            let area = if density > 0.0 {
+                cells as f64 / density
+            } else {
+                0.0
+            };
+            ui.weak(format!(
+                "{} cells | {:.2} ha | {:.0} plants/ha",
+                cells, area, density
+            ));
+            if changed {
+                self.allocations[self.selected] = None;
+            }
+        }
 
         ui.separator();
         ui.label("Species filter");
@@ -358,7 +455,7 @@ impl App {
     }
 
     fn stats(&self, ui: &mut egui::Ui, allocation: &Allocation) {
-        let polygon = &self.polygons[self.selected];
+        let polygon = self.entry_polygon(self.selected);
         let show_before = self.view_before;
 
         let initial_total: f64 = self
@@ -389,10 +486,7 @@ impl App {
             ui.strong(polygon.get_polygon_id());
             ui.label(format!("{:.2} ha", polygon.get_area_hectare()));
             ui.separator();
-            ui.label(format!(
-                "grid {}x{}",
-                allocation.dimension, allocation.dimension
-            ));
+            ui.label(format!("grid {}x{}", allocation.width, allocation.height));
             ui.label(format!(
                 "placed {} (target {}, band [{}..{}])",
                 placed,

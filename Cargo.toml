@@ -14,3 +14,11 @@ path = "src/bin/simulation.rs"
 [[bin]]
 name = "writer"
 path = "src/bin/writer.rs"
+
+[[bin]]
+name = "ui"
+path = "src/bin/ui.rs"
+
+[dependencies]
+eframe = { version = "0.36", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+egui = "0.36"

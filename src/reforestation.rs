@@ -5,7 +5,7 @@ use crate::formatting::format_g;
 
 pub const SPECIE_LEN: usize = 32;
 pub const POLYGON_ID_LEN: usize = 16;
-pub const PLANT_SERIALIZED_SIZE: usize = 56;
+pub const PLANT_SERIALIZED_SIZE: usize = 72;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -16,18 +16,19 @@ pub struct Plant {
     pub height: [i32; 2],
     pub root_depth: [i32; 2],
     pub root_spread_radius: i32,
-    pub interaction_index: f32
+    pub interaction_index: f32,
 }
 
 impl Plant {
     pub fn new(
-        specie: &str, 
-        unitary_cost: f64, 
-        per_hectare: i32, 
-        height: [i32; 2], 
+        specie: &str,
+        unitary_cost: f64,
+        per_hectare: i32,
+        height: [i32; 2],
         root_depth: [i32; 2],
         root_spread_radius: i32,
-        interaction_index: f32) -> Self {
+        interaction_index: f32,
+    ) -> Self {
         Plant {
             specie: Self::encode_id(specie),
             unitary_cost,
@@ -35,7 +36,7 @@ impl Plant {
             height,
             root_depth,
             root_spread_radius,
-            interaction_index
+            interaction_index,
         }
     }
 
@@ -115,8 +116,8 @@ impl Plant {
         let mut i32_buffer = [0u8; 4];
         reader.read_exact(&mut i32_buffer)?;
         let root_spread_radius = i32::from_le_bytes(i32_buffer);
-        
-        let mut f32_buffer= [0u8;4];
+
+        let mut f32_buffer = [0u8; 4];
         reader.read_exact(&mut f32_buffer)?;
         let interaction_index = f32::from_le_bytes(f32_buffer);
 
@@ -130,7 +131,7 @@ impl Plant {
             height,
             root_depth,
             root_spread_radius,
-            interaction_index
+            interaction_index,
         })
     }
 
@@ -150,9 +151,9 @@ impl Default for Plant {
             unitary_cost: 0.0,
             per_hectare: 0,
             height: [0, 0],
-            root_depth: [0,0],
+            root_depth: [0, 0],
             root_spread_radius: 0,
-            interaction_index: 0.0
+            interaction_index: 0.0,
         }
     }
 }

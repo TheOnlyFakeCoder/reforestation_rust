@@ -1,34 +1,25 @@
-pub fn map_creation(area_hectare: f64) -> Vec<Vec<i32>> {
-    let conversion = 10000;
-    let map_squared = (conversion as f64 * area_hectare) as i32;
-    let map_dimension = ((map_squared as f64).sqrt() / 1.7).round() as i32;
+pub fn map_dimension(area_hectare: f64, plants_per_hectare: f64) -> usize {
+    let cells = (plants_per_hectare.max(0.0) * area_hectare.max(0.0))
+        .sqrt()
+        .round() as usize;
+    cells.max(1)
+}
+
+pub fn map_creation(area_hectare: f64, plants_per_hectare: f64) -> Vec<Vec<i32>> {
     let empty_plant = 0;
-    let scaler = 1.0;
-    let dimension = (map_dimension as f64 / scaler).round() as usize;
+    let dimension = map_dimension(area_hectare, plants_per_hectare);
 
     vec![vec![empty_plant; dimension]; dimension]
 }
 
-pub fn initialize_unfeasible_map(area_hectare: f64) -> Vec<Vec<i32>> {
-    let mut initial_map = map_creation(area_hectare);
-    let dimension = initial_map.len();
+pub fn initialize_unfeasible_map(area_hectare: f64, plants_per_hectare: f64) -> Vec<Vec<i32>> {
+    let mut initial_map = map_creation(area_hectare, plants_per_hectare);
     let mut count = 0;
 
-    for i in 0..dimension {
-        if i % 2 == 0 {
-            let mut j = 0;
-            while j < dimension {
-                count += 1;
-                initial_map[i][j] = 1;
-                j += 2;
-            }
-        } else {
-            let mut j = 1;
-            while j < dimension {
-                count += 1;
-                initial_map[i][j] = 1;
-                j += 2;
-            }
+    for row in initial_map.iter_mut() {
+        for cell in row.iter_mut() {
+            *cell = 1;
+            count += 1;
         }
     }
 

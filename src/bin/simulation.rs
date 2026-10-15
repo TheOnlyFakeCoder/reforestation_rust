@@ -4,8 +4,14 @@ use std::time::Instant;
 use reforestation::algorithm::Algorithm;
 use reforestation::competition::get_competition_matrix;
 use reforestation::formatting::to_string_double;
+use reforestation::hex_grid::HexCoord;
+use reforestation::interaction::{
+    combine_matrices, competitive_cost_matrix, get_ecological_interaction_matrix,
+};
 use reforestation::map::initialize_unfeasible_map;
 use reforestation::matrix_handler::MatrixHandler;
+use reforestation::tabu::{TabuConfig, TabuSearch, DEFAULT_ROW_SEQUENCE};
+use reforestation::terrain::TerrainMap;
 use reforestation::writer::{read_plants_file, read_polygons_file};
 use reforestation::Wasted;
 
@@ -69,9 +75,97 @@ fn main() {
         );
     }
 
-    MatrixHandler::print_matrix_elements(&initialize_unfeasible_map(
-        polygons[0].get_area_hectare(),
-    ));
+    let plants_per_hectare: f64 = plants
+        .iter()
+        .map(|plant| plant.get_per_hectare() as f64)
+        .sum();
+    let unfeasible_map =
+        initialize_unfeasible_map(polygons[0].get_area_hectare(), plants_per_hectare);
+    MatrixHandler::print_matrix_elements(&unfeasible_map);
+
+    let interaction_matrix = get_ecological_interaction_matrix(&plants);
+    println!();
+    println!("Ecological Interaction Matrix");
+    MatrixHandler::print_matrix_elements(&interaction_matrix);
+
+    let combined_matrix = combine_matrices(&coefficients_matrix, &interaction_matrix);
+    println!();
+    println!("Combined Competition Matrix");
+    MatrixHandler::print_matrix_elements(&combined_matrix);
+
+    let cost_matrix = competitive_cost_matrix(&coefficients_matrix, &interaction_matrix);
+    println!();
+    println!("Competitive Cost Matrix");
+    MatrixHandler::print_matrix_elements(&cost_matrix);
+
+    let terrain = TerrainMap::from_map(&unfeasible_map);
+    println!();
+    println!(
+        "TerrainMap {}x{} | occupied slots: {}",
+        terrain.width(),
+        terrain.height(),
+        terrain.occupied_count()
+    );
+
+    let sample = HexCoord::from_offset(0, 0);
+    for radius in 1..=3 {
+        println!(
+            "Occupied neighbors within radius {} of origin: {}",
+            radius,
+            terrain.occupied_neighbors(&sample, radius).len()
+        );
+    }
+
+    println!();
+    println!("Tabu Search Allocation");
+    let tabu_config = TabuConfig {
+        budget_per_hectare: _budget,
+        ..TabuConfig::default()
+    };
+    let allocations: Vec<_> = polygons
+        .iter()
+        .map(|polygon| {
+            (
+                polygon,
+                TabuSearch::new(&plants, polygon, tabu_config)
+                    .with_row_sequence(DEFAULT_ROW_SEQUENCE.to_vec())
+                    .solve(),
+            )
+        })
+        .collect();
+    for (polygon, allocation) in &allocations {
+        println!("{} -> {}", polygon.get_polygon_id(), allocation);
+    }
+
+    if let Some((polygon, allocation)) = allocations.first() {
+        println!();
+        println!("=== {} detailed allocation ===", polygon.get_polygon_id());
+        println!(
+            "{:<4}{:<28}{:>7}{:>8}{:>7}{:>8}{:>8}",
+            "#", "species", "min", "target", "max", "placed", "$/ha"
+        );
+        for (index, plant) in plants.iter().enumerate() {
+            println!(
+                "{:<4}{:<28}{:>7}{:>8}{:>7}{:>8}{:>8.0}",
+                index,
+                plant.get_specie(),
+                allocation.min_counts[index],
+                allocation.target[index],
+                allocation.max_counts[index],
+                allocation.counts[index],
+                plant.get_unitary_cost() * plant.get_per_hectare() as f64,
+            );
+        }
+        println!();
+        println!("plan {:.4} ha", polygon.get_area_hectare());
+        println!("{}", allocation);
+        println!();
+        println!("Initial pattern (before optimization):");
+        print!("{}", allocation.initial_grid_string());
+        println!();
+        println!("Optimized grid (species index per cell, . = not plantable):");
+        print!("{}", allocation.grid_string());
+    }
 
     let duration = start.elapsed();
     println!("Execution Time in ms {}", duration.as_secs_f64() * 1000.0);

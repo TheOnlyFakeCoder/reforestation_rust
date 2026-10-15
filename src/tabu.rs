@@ -351,21 +351,20 @@ impl<'a> TabuSearch<'a> {
             } else {
                 sequence
             };
-            let mut start = 0;
-            while start < capacity {
-                let row = self.coords[start].to_offset().1;
-                let mut end = start;
-                while end < capacity && self.coords[end].to_offset().1 == row {
-                    end += 1;
-                }
-
-                for (offset, cell) in (start..end).enumerate() {
-                    let species_index = sequence[offset % sequence.len()];
+            let mut sequence_index = 0;
+            for row in 0..dimension {
+                let cols: Box<dyn Iterator<Item = usize>> = if row % 2 == 0 {
+                    Box::new(0..dimension)
+                } else {
+                    Box::new((0..dimension).rev())
+                };
+                for col in cols {
+                    let cell = row * dimension + col;
+                    let species_index = sequence[sequence_index % sequence.len()];
+                    sequence_index += 1;
                     species[cell] = species_index as i32;
                     counts[species_index] += 1;
                 }
-
-                start = end;
             }
 
             pattern_species = Some(species.clone());
@@ -656,22 +655,31 @@ mod tests {
     }
 
     #[test]
-    fn row_sequence_makes_rows_identical_before_repair() {
+    fn row_sequence_snakes_across_rows() {
         let plants = plants();
         let polygon = polygon();
+        let sequence = vec![0usize, 1, 2];
         let allocation = TabuSearch::new(&plants, &polygon, TabuConfig::default())
-            .with_row_sequence(vec![0, 1, 2])
+            .with_row_sequence(sequence.clone())
             .solve();
 
         let dimension = allocation.dimension;
-        let mut rows: Vec<Vec<Option<usize>>> = vec![Vec::new(); dimension];
-        for (index, coord) in allocation.coords.iter().enumerate() {
-            let (_, row) = coord.to_offset();
-            rows[row as usize].push(allocation.initial_species[index]);
+        let mut position = 0;
+        for row in 0..dimension {
+            let cols: Vec<usize> = if row % 2 == 0 {
+                (0..dimension).collect()
+            } else {
+                (0..dimension).rev().collect()
+            };
+            for col in cols {
+                let cell = row * dimension + col;
+                assert_eq!(
+                    allocation.initial_species[cell],
+                    Some(sequence[position % sequence.len()])
+                );
+                position += 1;
+            }
         }
-        let first = rows[0].clone();
-        assert!(!first.is_empty());
-        assert!(rows.iter().all(|row| *row == first));
     }
 
     #[test]

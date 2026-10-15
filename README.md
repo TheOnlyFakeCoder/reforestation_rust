@@ -42,12 +42,87 @@ This is a Rust port of the C++ reference in `../reforestation`.
 | `src/bin/writer.rs` | Generates the sample data files in `bins/` |
 | `bins/` | Sample `plants.bin`, `polygons.bin`, `steadyValues.bin` |
 
-## Requirements
+## Platform support
 
-- Rust (edition 2021)
-- Linux with X11 or Wayland for the UI (uses `glow`)
+The project builds and runs on Linux, macOS, and Windows.
+
+- The library and the `simulation` / `writer` binaries are pure Rust and OS-independent.
+- The `ui` binary uses `eframe`/`egui` with the `glow` (OpenGL) backend, which works on all three
+  platforms.
+- Data files are read from `bins/*.bin` using relative paths, so run the binaries from the project
+  root.
+
+Note: `Cargo.toml` currently enables the `x11` and `wayland` features on `eframe`. Those are
+Linux-only winit backends; they are forwarded to winit/glutin which target-gate them, so they are
+no-ops on Windows/macOS and the build still works. To be explicit, they can be gated to Linux:
+
+```toml
+[dependencies]
+eframe = { version = "0.36", default-features = false, features = ["glow", "default_fonts"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+eframe = { version = "0.36", features = ["x11", "wayland"] }
+```
+
+## Setup per OS
+
+### Linux
+
+1. Install Rust (edition 2021 toolchain):
+
+   ```sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+2. Install the system libraries needed by the UI (X11/Wayland + OpenGL). For Debian/Ubuntu:
+
+   ```sh
+   sudo apt-get update
+   sudo apt-get install -y build-essential pkg-config \
+     libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxinerama-dev \
+     libgl1-mesa-dev libegl1-mesa-dev libwayland-dev libxkbcommon-dev
+   ```
+
+   Fedora:
+
+   ```sh
+   sudo dnf install -y gcc-c++ pkgconf-pkg-config \
+     libX11-devel libXcursor-devel libXrandr-devel libXi-devel libXinerama-devel \
+     mesa-libGL-devel mesa-libEGL-devel wayland-devel libxkbcommon-devel
+   ```
+
+3. Build and run (see below). The UI needs an X11 or Wayland session (`$DISPLAY` or
+   `$WAYLAND_DISPLAY` set).
+
+### macOS
+
+1. Install the Xcode command line tools (provides the linker and system SDK):
+
+   ```sh
+   xcode-select --install
+   ```
+
+2. Install Rust:
+
+   ```sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+3. Build and run (see below). No extra system libraries are required. The `glow` backend uses
+   OpenGL, which Apple has deprecated but still supports; to use Metal instead, switch the UI to
+   the `wgpu` backend later.
+
+### Windows
+
+1. Install the Microsoft C++ build tools: download **Visual Studio Build Tools** and select the
+   **Desktop development with C++** workload (provides the MSVC linker).
+2. Install Rust with the default MSVC toolchain: download and run `rustup-init.exe` from
+   <https://rustup.rs> (host triple `x86_64-pc-windows-msvc`).
+3. Build and run (see below) from PowerShell or `cmd.exe`. No extra system libraries are required.
 
 ## Build and test
+
+Identical on all platforms:
 
 ```sh
 cargo build
@@ -76,6 +151,8 @@ Launch the interactive UI:
 ```sh
 cargo run --bin ui
 ```
+
+The `cargo run ...` commands are the same in PowerShell/`cmd.exe` on Windows.
 
 ## UI overview
 

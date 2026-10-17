@@ -88,10 +88,16 @@ fn malla_exporta_resumen_anillos_y_w() {
 
     let resumen = std::fs::read_to_string(resultados.join("malla_resumen.csv")).unwrap();
     assert_eq!(resumen.lines().count(), 32);
-    assert!(resumen.lines().any(|l| l.starts_with("map_27,27,1.28,837,842,-5,837,")));
+    let p1 = resumen.lines().find(|l| l.starts_with("map_27,")).unwrap();
+    assert!(p1.starts_with("map_27,27,1.28,26,33,alterna,"), "{p1}");
+    assert!(p1.contains(",842,842,0,842,"), "{p1}");
 
     let anillos = std::fs::read_to_string(resultados.join("malla_anillos.csv")).unwrap();
     assert_eq!(anillos.lines().count(), 1 + 31 * 3);
+
+    let alcance = std::fs::read_to_string(resultados.join("alcance_h.csv"))
+        .expect("`reto malla` debe exportar alcance_h.csv");
+    assert_eq!(alcance.lines().count(), 1 + 6 * 3);
 
     let w = std::fs::read_to_string(resultados.join("W.csv")).unwrap();
     let filas: Vec<Vec<&str>> = w.lines().map(|l| l.split(',').collect()).collect();
@@ -99,7 +105,13 @@ fn malla_exporta_resumen_anillos_y_w() {
     assert_eq!(filas[1][9].parse::<f64>().unwrap(), 0.0);
 
     let texto = String::from_utf8_lossy(&salida.stdout);
-    assert!(texto.contains("658") && texto.contains("837"), "{texto}");
+    // Cambio de requisito (usuario, 2026-10-17): malla rectangular con D_tot = round(658·A);
+    // P1 pasa de 837 a 842 posiciones, así que "837" ya no es el comportamiento esperado.
+    assert!(texto.contains("658") && texto.contains("842"), "{texto}");
+    assert!(
+        texto.contains("26 x 33") && texto.contains("excedente = 0"),
+        "la salida debe mostrar columnas x filas y el excedente: {texto}"
+    );
 }
 
 #[test]

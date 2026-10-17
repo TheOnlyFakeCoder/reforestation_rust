@@ -11,7 +11,7 @@ use reforestation::competencia::matriz_w;
 use reforestation::config::Config;
 use reforestation::datos::Datos;
 use reforestation::reportes::{
-    escribir_anillos, escribir_resumen_malla, escribir_w, resumen_malla,
+    escribir_alcance, escribir_anillos, escribir_resumen_malla, escribir_w, resumen_malla,
 };
 
 /// Configuración compartida con Python; si no existe se usan los valores por defecto.
@@ -95,14 +95,30 @@ fn malla(
     let filas = resumen_malla(&datos, config);
     escribir_resumen_malla(&resultados_dir.join("malla_resumen.csv"), &filas)?;
     escribir_anillos(&resultados_dir.join("malla_anillos.csv"), &filas, config.d)?;
+    escribir_alcance(
+        &resultados_dir.join("alcance_h.csv"),
+        &datos.especies,
+        config,
+        &filas[0].anillos_m,
+    )?;
     let w = matriz_w(&datos.especies, config.kappa);
     escribir_w(&resultados_dir.join("W.csv"), &datos.especies, &w)?;
 
     println!("d = {:.4} m", config.d);
     for fila in filas.iter().take(2) {
         println!(
-            "{:<8} A = {:.2} ha  |V| = {}  round(658A) = {}  dif = {}  D_tot = {}",
-            fila.instancia, fila.area, fila.n_pos, fila.objetivo, fila.diferencia, fila.d_tot
+            "{:<8} A = {:.2} ha  {} x {} ({:.1} x {:.1} m)  |V| = {}  round(658A) = {}  \
+             excedente = {}  D_tot = {}",
+            fila.instancia,
+            fila.area,
+            fila.columnas,
+            fila.filas,
+            fila.ancho_m,
+            fila.alto_m,
+            fila.n_pos,
+            fila.objetivo,
+            fila.excedente,
+            fila.d_tot
         );
         for (k, (distancia, pares)) in fila.anillos_m.iter().zip(&fila.pares).enumerate() {
             println!(

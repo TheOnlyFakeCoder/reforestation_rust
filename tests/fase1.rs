@@ -17,7 +17,7 @@ fn tabla_1ha(factor: f64) -> (TablaCompetencia, usize, f64) {
     let especies = Datos::base().especies;
     let r = radios(&especies, config.d, factor);
     let radio = radio_max(&r, config.d);
-    let vecindad = Malla::cuadrada(1.0, config.d).vecindad(radio, config.tolerancia);
+    let vecindad = Malla::para_objetivo(658, config.d).vecindad(radio, config.tolerancia);
     let w = matriz_w(&especies, config.kappa);
     let tabla = TablaCompetencia::nueva(&w, &r, &vecindad.anillos, config.d, config.tolerancia);
     (tabla, vecindad.anillos.len(), radio / config.d)

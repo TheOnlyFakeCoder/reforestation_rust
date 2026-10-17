@@ -51,19 +51,21 @@ impl Config {
 
     /// Revisa que los parámetros tengan sentido; el mensaje nombra el campo que falla.
     pub fn validar(&self) -> Result<(), String> {
-        if !(self.d > 0.0) {
+        // `is_nan()` explícito: NaN no es > 0 pero tampoco es <= 0.
+        let no_positivo = |x: f64| x.is_nan() || x <= 0.0;
+        if no_positivo(self.d) {
             return Err(format!("d debe ser > 0 (vale {})", self.d));
         }
-        if !(self.tolerancia > 0.0) {
+        if no_positivo(self.tolerancia) {
             return Err(format!("tolerancia debe ser > 0 (vale {})", self.tolerancia));
         }
         if !(0.0..1.0).contains(&self.epsilon) {
             return Err(format!("epsilon debe estar en [0, 1) (vale {})", self.epsilon));
         }
-        if !(self.kappa >= 0.0) {
+        if self.kappa.is_nan() || self.kappa < 0.0 {
             return Err(format!("kappa debe ser ≥ 0 (vale {})", self.kappa));
         }
-        if !(self.factor_radios > 0.0) {
+        if no_positivo(self.factor_radios) {
             return Err(format!("factor_radios debe ser > 0 (vale {})", self.factor_radios));
         }
         Ok(())

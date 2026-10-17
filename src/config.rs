@@ -41,7 +41,32 @@ impl Config {
     pub fn cargar(path: &Path) -> Result<Config, Box<dyn Error>> {
         let texto =
             std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        Ok(serde_json::from_str(&texto).map_err(|e| format!("{}: {e}", path.display()))?)
+        let config: Config =
+            serde_json::from_str(&texto).map_err(|e| format!("{}: {e}", path.display()))?;
+        config
+            .validar()
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        Ok(config)
+    }
+
+    /// Revisa que los parámetros tengan sentido; el mensaje nombra el campo que falla.
+    pub fn validar(&self) -> Result<(), String> {
+        if !(self.d > 0.0) {
+            return Err(format!("d debe ser > 0 (vale {})", self.d));
+        }
+        if !(self.tolerancia > 0.0) {
+            return Err(format!("tolerancia debe ser > 0 (vale {})", self.tolerancia));
+        }
+        if !(0.0..1.0).contains(&self.epsilon) {
+            return Err(format!("epsilon debe estar en [0, 1) (vale {})", self.epsilon));
+        }
+        if !(self.kappa >= 0.0) {
+            return Err(format!("kappa debe ser ≥ 0 (vale {})", self.kappa));
+        }
+        if !(self.factor_radios > 0.0) {
+            return Err(format!("factor_radios debe ser > 0 (vale {})", self.factor_radios));
+        }
+        Ok(())
     }
 
     /// Sobrescribe un campo con `"clave=valor"`; el valor se interpreta como JSON.
@@ -58,7 +83,10 @@ impl Config {
             return Err(format!("clave desconocida: {clave}"));
         }
         objeto.insert(clave.to_string(), valor);
-        *self = serde_json::from_value(json).map_err(|e| format!("{asignacion}: {e}"))?;
+        let nueva: Config =
+            serde_json::from_value(json).map_err(|e| format!("{asignacion}: {e}"))?;
+        nueva.validar()?;
+        *self = nueva;
         Ok(())
     }
 }
@@ -100,6 +128,80 @@ mod tests {
         assert!(config.aplicar("radio=2").is_err());
         assert!(config.aplicar("epsilon").is_err());
         assert_eq!(config, Config::default());
+    }
+
+    #[test]
+    fn validar_rechaza_d_no_positivo() {
+        assert!(Config::default().validar().is_ok());
+        let config = Config {
+            d: 0.0,
+            ..Config::default()
+        };
+        let error = config.validar().unwrap_err();
+        assert!(error.contains("d"), "{error}");
+    }
+
+    #[test]
+    fn validar_rechaza_tolerancia_no_positiva() {
+        let config = Config {
+            tolerancia: -1.0,
+            ..Config::default()
+        };
+        let error = config.validar().unwrap_err();
+        assert!(error.contains("tolerancia"), "{error}");
+    }
+
+    #[test]
+    fn validar_rechaza_epsilon_fuera_de_0_a_1() {
+        for epsilon in [-0.1, 1.0] {
+            let config = Config {
+                epsilon,
+                ..Config::default()
+            };
+            let error = config.validar().unwrap_err();
+            assert!(error.contains("epsilon"), "{error}");
+        }
+        let cero = Config {
+            epsilon: 0.0,
+            ..Config::default()
+        };
+        assert!(cero.validar().is_ok());
+    }
+
+    #[test]
+    fn validar_rechaza_kappa_negativo() {
+        let config = Config {
+            kappa: -0.5,
+            ..Config::default()
+        };
+        let error = config.validar().unwrap_err();
+        assert!(error.contains("kappa"), "{error}");
+    }
+
+    #[test]
+    fn validar_rechaza_factor_radios_no_positivo() {
+        let config = Config {
+            factor_radios: 0.0,
+            ..Config::default()
+        };
+        let error = config.validar().unwrap_err();
+        assert!(error.contains("factor_radios"), "{error}");
+    }
+
+    #[test]
+    fn aplicar_valida_y_no_cambia_nada_si_el_valor_es_invalido() {
+        let mut config = Config::default();
+        let error = config.aplicar("d=0").unwrap_err();
+        assert!(error.contains("d"), "{error}");
+        assert_eq!(config, Config::default());
+    }
+
+    #[test]
+    fn cargar_valida_el_archivo() {
+        let path = std::env::temp_dir().join(format!("reto_cfg_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"epsilon": 1.5}"#).unwrap();
+        let error = Config::cargar(&path).unwrap_err().to_string();
+        assert!(error.contains("epsilon"), "{error}");
     }
 
     #[test]

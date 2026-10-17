@@ -83,6 +83,13 @@ impl TablaCompetencia {
         d: f64,
         tol: f64,
     ) -> TablaCompetencia {
+        assert_eq!(
+            radios.len(),
+            w.len(),
+            "hay {} radios para {} especies de W",
+            radios.len(),
+            w.len()
+        );
         let n = w.len() + 1;
         let mut wh = vec![0.0; anillos.len() * n * n];
         for (anillo, &delta) in anillos.iter().enumerate() {
@@ -215,5 +222,13 @@ mod tests {
                 assert_eq!(tabla.peso(anillo, a, VACIA), 0.0);
             }
         }
+    }
+
+    #[test]
+    #[should_panic(expected = "radios")]
+    fn tabla_rechaza_radios_con_otra_longitud_que_w() {
+        let especies = Datos::base().especies;
+        let r = radios(&especies, D, 1.0);
+        TablaCompetencia::nueva(&w(), &r[..9], &[D], D, 1e-6);
     }
 }

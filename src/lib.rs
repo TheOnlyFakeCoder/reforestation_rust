@@ -2,6 +2,7 @@
 
 pub mod algorithm;
 pub mod competition;
+pub mod config;
 pub mod datos;
 pub mod formatting;
 pub mod hex_grid;

@@ -1,0 +1,8 @@
+numpy
+scipy
+pandas
+matplotlib
+pulp
+highspy
+ortools
+pytest

@@ -41,6 +41,38 @@ fn subcomando_desconocido_termina_con_error_sin_escribir() {
 }
 
 #[test]
+fn opcion_sin_valor_termina_con_error_sin_escribir() {
+    let raiz = dir_temporal("sin_valor");
+    let salida = Command::new(env!("CARGO_BIN_EXE_reto"))
+        .args(["datos", "--datos"])
+        .current_dir(&raiz)
+        .output()
+        .unwrap();
+    assert!(!salida.status.success(), "`reto datos --datos` (sin valor) debería fallar");
+    assert!(String::from_utf8_lossy(&salida.stderr).contains("--datos"));
+    assert!(!raiz.join("data").exists(), "no debe escribir en la carpeta por defecto");
+}
+
+#[test]
+fn opcion_desconocida_termina_con_error_sin_escribir() {
+    let datos = dir_temporal("opcion_desconocida");
+    let resultados = datos.join("resultados");
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    let salida = reto(&[
+        "malla",
+        "--datos",
+        datos.to_str().unwrap(),
+        "--resultados",
+        resultados.to_str().unwrap(),
+        "--sett",
+        "kappa=0.4",
+    ]);
+    assert!(!salida.status.success(), "`--sett` (typo de --set) debería fallar");
+    assert!(String::from_utf8_lossy(&salida.stderr).contains("--sett"));
+    assert!(!resultados.exists(), "no debe escribir resultados con opciones inválidas");
+}
+
+#[test]
 fn malla_exporta_resumen_anillos_y_w() {
     let datos = dir_temporal("malla_datos");
     let resultados = dir_temporal("malla_resultados");

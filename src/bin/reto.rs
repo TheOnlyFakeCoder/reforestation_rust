@@ -28,16 +28,39 @@ fn main() -> ExitCode {
     }
 }
 
-fn opcion(args: &[String], nombre: &str, por_defecto: &str) -> String {
-    args.windows(2)
-        .find(|par| par[0] == nombre)
-        .map(|par| par[1].clone())
-        .unwrap_or_else(|| por_defecto.to_string())
+/// Valor de `nombre VALOR`; error si la opción aparece sin valor.
+fn opcion(args: &[String], nombre: &str, por_defecto: &str) -> Result<String, String> {
+    match args.iter().position(|a| a == nombre) {
+        None => Ok(por_defecto.to_string()),
+        Some(i) => args
+            .get(i + 1)
+            .filter(|valor| !valor.starts_with("--"))
+            .cloned()
+            .ok_or_else(|| format!("{nombre} requiere un valor")),
+    }
+}
+
+const OPCIONES: [&str; 4] = ["--datos", "--resultados", "--config", "--set"];
+
+/// Tras el subcomando sólo se aceptan pares `--opción valor` con opciones conocidas.
+fn validar_opciones(args: &[String]) -> Result<(), String> {
+    let mut resto = args.iter().skip(2);
+    while let Some(nombre) = resto.next() {
+        if !OPCIONES.contains(&nombre.as_str()) {
+            return Err(format!("opción desconocida: {nombre}"));
+        }
+        match resto.next() {
+            Some(valor) if !valor.starts_with("--") => {}
+            _ => return Err(format!("{nombre} requiere un valor")),
+        }
+    }
+    Ok(())
 }
 
 fn ejecutar(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
-    let datos_dir = opcion(args, "--datos", "data");
-    let resultados_dir = opcion(args, "--resultados", "results");
+    validar_opciones(args)?;
+    let datos_dir = opcion(args, "--datos", "data")?;
+    let resultados_dir = opcion(args, "--resultados", "results")?;
     match args.get(1).map(String::as_str) {
         Some("datos") => {
             Datos::base().escribir(Path::new(&datos_dir))?;

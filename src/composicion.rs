@@ -31,16 +31,20 @@ pub struct Banda {
     pub u: Vec<usize>,
 }
 
+/// Holgura para que (1 ± ε)·D̄ entero no pierda la frontera por punto flotante
+/// (1.15 · 100 = 114.99999999999999).
+const HOLGURA: f64 = 1e-9;
+
 /// L_j = ceil((1 − ε)·D̄_j), U_j = floor((1 + ε)·D̄_j).
 pub fn banda(nominal: &[usize], epsilon: f64) -> Banda {
     Banda {
         l: nominal
             .iter()
-            .map(|&x| ((1.0 - epsilon) * x as f64).ceil() as usize)
+            .map(|&x| ((1.0 - epsilon) * x as f64 - HOLGURA).ceil() as usize)
             .collect(),
         u: nominal
             .iter()
-            .map(|&x| ((1.0 + epsilon) * x as f64).floor() as usize)
+            .map(|&x| ((1.0 + epsilon) * x as f64 + HOLGURA).floor() as usize)
             .collect(),
     }
 }
@@ -83,6 +87,14 @@ mod tests {
         let b = banda(&[42, 10, 196, 0], 0.10);
         assert_eq!(b.l, vec![38, 9, 177, 0]);
         assert_eq!(b.u, vec![46, 11, 215, 0]);
+    }
+
+    #[test]
+    fn banda_no_pierde_la_frontera_entera_por_punto_flotante() {
+        // 1.15 · 100 = 114.99999999999999 en punto flotante; la frontera exacta es 115.
+        let b = banda(&[100, 180], 0.15);
+        assert_eq!(b.u, vec![115, 207]);
+        assert_eq!(b.l, vec![85, 153]);
     }
 
     #[test]

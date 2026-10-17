@@ -7,6 +7,7 @@ pub mod datos;
 pub mod formatting;
 pub mod hex_grid;
 pub mod interaction;
+pub mod malla;
 pub mod map;
 pub mod matrix_handler;
 pub mod reforestation;

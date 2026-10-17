@@ -57,23 +57,28 @@ fn los_30_poligonos_tienen_malla_y_composicion_consistentes() {
     let config = Config::default();
     let delta: Vec<u32> = datos.especies.iter().map(|e| e.delta).collect();
     let r = radios(&datos.especies, config.d, config.factor_radios);
-    for p in &datos.poligonos {
-        let malla = Malla::cuadrada(p.area, config.d);
-        // Efecto de borde del cuadrado: el peor caso es map 12 (1.47 ha, lado 121.2 m), donde se
-        // pierden casi una fila y una columna: |V| = 941 contra round(658·A) = 967 (−2.7 %).
-        let razon = malla.len() as f64 / (658.0 * p.area);
-        assert!((0.97..=1.015).contains(&razon), "map {}: |V|/658A = {razon}", p.map_id);
+    // 1 ha (map_id 0 en los mensajes) más los 30 polígonos.
+    let instancias = std::iter::once((0, 1.0)).chain(datos.poligonos.iter().map(|p| (p.map_id, p.area)));
+    for (map_id, area) in instancias {
+        let objetivo = (658.0 * area).round() as usize;
+        let malla = Malla::para_objetivo(objetivo, config.d);
+        // Malla rectangular casi cuadrada: excedente máximo observado 8 (map 7, 4140 vs 4132).
+        let excedente = malla.len() - objetivo;
+        assert!(excedente <= 8, "map {map_id}: excedente {excedente}");
+        let proporcion = malla.ancho / malla.alto;
+        assert!((0.8..=1.25).contains(&proporcion), "map {map_id}: ancho/alto {proporcion}");
 
-        let total = d_tot(malla.len(), p.area, datos.densidad_total());
+        let total = d_tot(malla.len(), area, datos.densidad_total());
+        assert_eq!(total, objetivo, "map {map_id}: D_tot debe ser round(658·A)");
         let nominal = composicion_nominal(total, &delta);
-        assert_eq!(nominal.iter().sum::<usize>(), total, "map {}", p.map_id);
+        assert_eq!(nominal.iter().sum::<usize>(), total, "map {map_id}");
         let b = banda(&nominal, config.epsilon);
         for j in 0..nominal.len() {
-            assert!(b.l[j] <= nominal[j] && nominal[j] <= b.u[j], "map {} especie {j}", p.map_id);
+            assert!(b.l[j] <= nominal[j] && nominal[j] <= b.u[j], "map {map_id} especie {j}");
         }
 
         let vecindad = malla.vecindad(radio_max(&r, config.d), config.tolerancia);
-        assert_eq!(vecindad.anillos.len(), 3, "map {}", p.map_id);
-        assert_eq!(vecindad.max_vecinos(), 18, "map {}", p.map_id);
+        assert_eq!(vecindad.anillos.len(), 3, "map {map_id}");
+        assert_eq!(vecindad.max_vecinos(), 18, "map {map_id}");
     }
 }

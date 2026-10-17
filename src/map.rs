@@ -1,3 +1,6 @@
+//! LEGACY: malla cuadrada de round(sqrt(658·A)) celdas, sin distancia en metros. Reemplazada
+//! por `malla::Malla` (tresbolillo con d explícita).
+
 pub fn map_dimension(area_hectare: f64, plants_per_hectare: f64) -> usize {
     let cells = (plants_per_hectare.max(0.0) * area_hectare.max(0.0))
         .sqrt()

@@ -82,6 +82,8 @@ const RASGOS: [Rasgo; N_ESPECIES] = [
     ("Asparagaceae", "Yucca", "arborescente", 2, true, false, 7.0, 2.0),
 ];
 
+// 6.28 ha es el área de un polígono, no una aproximación de τ.
+#[allow(clippy::approx_constant)]
 const AREAS: [f64; 30] = [
     1.28, 6.64, 6.76, 1.38, 8.0, 7.82, 5.53, 5.64, 7.11, 6.11, 5.64, 4.92, 5.05, 4.75, 7.97, 7.34,
     5.98, 5.4, 6.28, 7.6, 8.0, 8.0, 7.67, 1.47, 4.19, 7.52, 8.0, 8.0, 7.56, 5.4,

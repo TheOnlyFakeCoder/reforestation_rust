@@ -1,3 +1,6 @@
+//! LEGACY: estado estacionario de Markov sobre la matriz de competencia legacy. No forma parte
+//! del modelo y no se reporta como resultado.
+
 use crate::formatting::to_string_double;
 use crate::reforestation::Polygon;
 

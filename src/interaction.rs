@@ -1,3 +1,6 @@
+//! LEGACY: índice de interacción sin fuente ni decaimiento con la distancia. Reemplazado por
+//! `competencia` (W de Gower y factor de alcance h).
+
 use crate::reforestation::Plant;
 
 const FACILITATION_FLOOR: f64 = 0.05;

@@ -1,3 +1,6 @@
+//! LEGACY: usa la densidad de plantación como rasgo, por eso la matriz sale casi identidad
+//! (A. salmiana ≈ 0.007 con todas). Reemplazado por `competencia::matriz_w`.
+
 use crate::reforestation::Plant;
 
 pub fn get_competition_matrix(plants: &[Plant]) -> Vec<Vec<f64>> {

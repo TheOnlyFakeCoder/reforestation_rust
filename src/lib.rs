@@ -13,6 +13,7 @@ pub mod malla;
 pub mod map;
 pub mod matrix_handler;
 pub mod reforestation;
+pub mod reportes;
 pub mod tabu;
 pub mod terrain;
 pub mod writer;

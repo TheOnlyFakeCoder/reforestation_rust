@@ -1,3 +1,8 @@
+//! LEGACY: búsqueda tabú del port de C++. Sólo tiene reasignación, se detiene tras 60
+//! iteraciones sin mejora, usa la matriz casi identidad de `combine_matrices` y una banda con
+//! floor/ceil invertidos. La UI y `simulation` la siguen usando; el modelo del Entregable 2 vive
+//! en los módulos nuevos (`composicion`, `competencia`, `malla` y la búsqueda tabú nueva).
+
 use std::collections::HashMap;
 use std::fmt;
 

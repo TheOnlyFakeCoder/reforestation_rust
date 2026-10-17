@@ -112,7 +112,7 @@ impl TablaCompetencia {
     }
 
     #[inline]
-    pub fn peso(&self, anillo: u8, a: u8, b: u8) -> f64 {
+    pub fn peso(&self, anillo: u16, a: u8, b: u8) -> f64 {
         self.wh[(anillo as usize * self.n + a as usize) * self.n + b as usize]
     }
 }

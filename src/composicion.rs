@@ -9,6 +9,7 @@ pub fn d_tot(n_posiciones: usize, area: f64, densidad: u32) -> usize {
 /// d_tot·δ_j/Σδ y el sobrante a las mayores partes decimales (empates: índice menor).
 pub fn composicion_nominal(d_tot: usize, delta: &[u32]) -> Vec<usize> {
     let suma: u64 = delta.iter().map(|&x| x as u64).sum();
+    debug_assert_eq!(suma, 658, "Σδ debe ser 658 plantas/ha");
     let productos: Vec<u64> = delta.iter().map(|&x| d_tot as u64 * x as u64).collect();
     let mut nominal: Vec<usize> = productos.iter().map(|&p| (p / suma) as usize).collect();
     let sobrante = d_tot - nominal.iter().sum::<usize>();
@@ -102,5 +103,12 @@ mod tests {
         let b = banda(&[54, 249, 33], 0.0);
         assert_eq!(b.l, vec![54, 249, 33]);
         assert_eq!(b.u, vec![54, 249, 33]);
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "658")]
+    fn mayor_residuo_exige_suma_de_delta_658_en_debug() {
+        composicion_nominal(10, &[1, 2]);
     }
 }

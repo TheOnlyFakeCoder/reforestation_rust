@@ -44,7 +44,7 @@ pub struct Malla {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Vecino {
     pub pos: u32,
-    pub anillo: u8,
+    pub anillo: u16,
 }
 
 /// Vecinos de cada posición agrupados por anillo (distancia distinta en la malla).
@@ -248,7 +248,8 @@ impl Malla {
             let anillo = anillos
                 .iter()
                 .position(|&a| (delta - a).abs() <= tol)
-                .expect("toda distancia pertenece a un anillo") as u8;
+                .expect("toda distancia pertenece a un anillo");
+            let anillo = u16::try_from(anillo).expect("más de 65 535 anillos");
             vecinos[u].push(Vecino {
                 pos: v as u32,
                 anillo,
@@ -419,6 +420,21 @@ mod tests {
             for p in &malla.posiciones {
                 assert!(p.x >= D / 2.0 - 1e-9 && p.x <= malla.ancho - D / 2.0 + 1e-9);
                 assert!(p.y >= h / 2.0 - 1e-9 && p.y <= malla.alto - h / 2.0 + 1e-9);
+            }
+        }
+    }
+
+    #[test]
+    fn mas_de_255_anillos_conservan_su_distancia() {
+        // 40 × 40 alterna con d = 1: 346 distancias distintas menores que 35.8 (contado en Python;
+        // la distancia de la red más cercana a 35.8 está a 0.009, lejos de la tolerancia).
+        let malla = Malla::rectangular(40, 40, Disposicion::Alterna, 1.0);
+        let vecindad = malla.vecindad(35.8, 1e-6);
+        assert_eq!(vecindad.anillos.len(), 346);
+        for (u, lista) in vecindad.vecinos.iter().enumerate() {
+            for vecino in lista {
+                let esperada = vecindad.anillos[vecino.anillo as usize];
+                assert!((malla.distancia(u, vecino.pos as usize) - esperada).abs() < 1e-6);
             }
         }
     }

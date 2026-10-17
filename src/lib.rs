@@ -2,6 +2,7 @@
 
 pub mod algorithm;
 pub mod competition;
+pub mod composicion;
 pub mod config;
 pub mod datos;
 pub mod formatting;

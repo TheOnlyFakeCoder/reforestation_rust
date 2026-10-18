@@ -1,0 +1,14 @@
+estadistico,valor
+n_poligonos,30.000000
+media_rho,129.182340
+sd_rho,3.345799
+sigma_mle,3.289563
+shapiro_p,0.205202
+dispersion_poisson,0.410251
+corr_rho_area,-0.378794
+chi2_homog,286.650433
+chi2_gl,261.000000
+chi2_p,0.132032
+precision_dm,15276.956146
+loglik_dm,-49777.784731
+loglik_multinomial,-49777.972829

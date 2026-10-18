@@ -1,4 +1,5 @@
 //! Pruebas de fase 3: escenarios Monte Carlo.
+#![allow(clippy::needless_range_loop)]
 
 use reforestation::escenarios::{estadisticos, generar, percentil, ParamsMc};
 

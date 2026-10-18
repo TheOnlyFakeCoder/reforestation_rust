@@ -4,6 +4,7 @@
 //!   datos   escribe `DIR/*.csv` con los datos del reto
 //!   malla   |V|, D_tot y pares por anillo de 1 ha y de cada polígono; exporta W
 //!   montecarlo  escenarios de existentes y resúmenes de C y costo [--instancias …|todas]
+//!   paso3  ajuste al polígono real por escenario [--instancias …|todas] [--compra CSV]
 //!   paso1  barrido de γ y patrón base [--instancias 1ha,map_27|todas] [--solo-gamma-star]
 
 use std::path::Path;
@@ -12,7 +13,10 @@ use std::process::ExitCode;
 use reforestation::competencia::matriz_w;
 use reforestation::config::Config;
 use reforestation::datos::{Datos, N_ESPECIES};
-use reforestation::escenarios::{generar, resumir, Escenario, ParamsMc};
+use reforestation::escenarios::{
+    estadisticos, generar, percentil, resumir, Escenario, ParamsMc,
+};
+use reforestation::paso3::{correr_instancia, leer_compra, leer_patron, EntradaPaso3};
 use reforestation::malla::Malla;
 use reforestation::paso1::{barrido_gamma, mejor_fila, FilaPaso1, Instancia};
 use reforestation::reportes::{
@@ -47,7 +51,8 @@ fn opcion(args: &[String], nombre: &str, por_defecto: &str) -> Result<String, St
     }
 }
 
-const OPCIONES: [&str; 5] = ["--datos", "--resultados", "--config", "--set", "--instancias"];
+const OPCIONES: [&str; 6] =
+    ["--datos", "--resultados", "--config", "--set", "--instancias", "--compra"];
 /// Opciones sin valor.
 const BANDERAS: [&str; 1] = ["--solo-gamma-star"];
 
@@ -117,6 +122,18 @@ fn ejecutar(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             let config = cargar_config(args)?;
             let instancias = opcion(args, "--instancias", "1ha,map_27")?;
             montecarlo(Path::new(&datos_dir), Path::new(&resultados_dir), &config, &instancias)
+        }
+        Some("paso3") => {
+            let config = cargar_config(args)?;
+            let instancias = opcion(args, "--instancias", "1ha,map_27")?;
+            let compra = opcion(args, "--compra", &format!("{resultados_dir}/paso2_compra.csv"))?;
+            paso3(
+                Path::new(&datos_dir),
+                Path::new(&resultados_dir),
+                &config,
+                &instancias,
+                Path::new(&compra),
+            )
         }
         otro => Err(format!("subcomando desconocido: {}", otro.unwrap_or("")).into()),
     }
@@ -371,5 +388,109 @@ fn paso1(
         )?;
     }
     println!("paso 1: {:.1} s", inicio.elapsed().as_secs_f64());
+    Ok(())
+}
+
+fn paso3(
+    datos_dir: &Path,
+    resultados_dir: &Path,
+    config: &Config,
+    instancias: &str,
+    compra: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let datos = Datos::cargar(datos_dir)?;
+    let pedidas = resolver_instancias(&datos, instancias)?;
+    let mc = ParamsMc::leer(&resultados_dir.join("mc_params.json"))?;
+    let params = config.tabu.params(config.semilla);
+    let inicio = std::time::Instant::now();
+
+    let mut esc = csv::Writer::from_path(resultados_dir.join("paso3_escenarios.csv"))?;
+    esc.write_record([
+        "instancia", "map_id", "omega", "caso", "T", "V_lib", "M", "Z", "Z_por_planta",
+        "tiempo_s", "iteraciones",
+    ])?;
+    let mut res = csv::Writer::from_path(resultados_dir.join("paso3_resumen.csv"))?;
+    res.write_record([
+        "instancia", "map_id", "n", "Z_media", "Z_sd", "Z_p5", "Z_p50", "Z_p95", "casos_usual",
+        "casos_presupuesto_corto", "casos_existentes_de_sobra",
+    ])?;
+    for (nombre, area) in &pedidas {
+        let t0 = std::time::Instant::now();
+        let instancia =
+            Instancia::nueva(nombre, *area, &datos, config, config.m_escala, config.usar_s2);
+        let base = leer_patron(&resultados_dir.join(format!("paso1_patron_{nombre}.csv")))?;
+        let (d, _, _) = leer_composicion(&resultados_dir.join("paso1_composicion.csv"), nombre)?;
+        let q = leer_compra(compra, nombre, config.epsilon, config.pi_factor)?;
+        let entrada = EntradaPaso3 {
+            instancia: &instancia,
+            base: &base,
+            q,
+            d,
+            mc: &mc,
+            semilla: config.semilla,
+        };
+        let (filas, phi0, e0) = correr_instancia(&entrada, config.n_escenarios_paso3, &params);
+        for f in &filas {
+            esc.write_record([
+                f.instancia.clone(),
+                f.map_id.to_string(),
+                f.omega.to_string(),
+                f.caso.como_str().to_string(),
+                f.t.to_string(),
+                f.v_lib.to_string(),
+                f.m.to_string(),
+                f.z.to_string(),
+                f.z_por_planta.to_string(),
+                f.tiempo_s.to_string(),
+                f.iteraciones.to_string(),
+            ])?;
+        }
+        let z: Vec<f64> = filas.iter().map(|f| f.z).collect();
+        let (media, sd) = estadisticos(&z);
+        let casos = |c: reforestation::paso3::Caso| filas.iter().filter(|f| f.caso == c).count();
+        use reforestation::paso3::Caso;
+        res.write_record([
+            nombre.clone(),
+            instancia.map_id.to_string(),
+            filas.len().to_string(),
+            media.to_string(),
+            sd.to_string(),
+            percentil(&z, 0.05).to_string(),
+            percentil(&z, 0.50).to_string(),
+            percentil(&z, 0.95).to_string(),
+            casos(Caso::Usual).to_string(),
+            casos(Caso::PresupuestoCorto).to_string(),
+            casos(Caso::ExistentesDeSobra).to_string(),
+        ])?;
+        // Patrón del escenario 0 con la marca de las existentes, para los mapas.
+        let mut patron = csv::Writer::from_path(
+            resultados_dir.join(format!("paso3_patron_{nombre}_omega0.csv")),
+        )?;
+        patron.write_record(["pos", "fila", "col", "x", "y", "especie", "existente"])?;
+        let existentes: std::collections::HashSet<usize> =
+            e0.posiciones.iter().map(|p| p.0).collect();
+        for (u, p) in instancia.malla.posiciones.iter().enumerate() {
+            patron.write_record([
+                u.to_string(),
+                p.fila.to_string(),
+                p.col.to_string(),
+                p.x.to_string(),
+                p.y.to_string(),
+                (phi0[u] as i32 - 1).to_string(),
+                (existentes.contains(&u) as u8).to_string(),
+            ])?;
+        }
+        patron.flush()?;
+        println!(
+            "{nombre}: Z media {media:.2} (sd {sd:.2}), usual/corto/sobra = {}/{}/{}, {:.1} s",
+            casos(Caso::Usual),
+            casos(Caso::PresupuestoCorto),
+            casos(Caso::ExistentesDeSobra),
+            t0.elapsed().as_secs_f64()
+        );
+    }
+    esc.flush()?;
+    res.flush()?;
+    println!("paso 3: {:.1} s", inicio.elapsed().as_secs_f64());
     Ok(())
 }

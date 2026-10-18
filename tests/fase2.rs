@@ -502,3 +502,171 @@ fn la_banda_nunca_se_viola_en_una_busqueda_mixta() {
         }
     }
 }
+
+#[test]
+fn theta_es_costo_por_mortalidad_con_escala_y_s2() {
+    use reforestation::datos::Datos;
+    use reforestation::paso1::theta;
+    let especies = Datos::base().especies;
+    let t = theta(&especies, 1.0, false);
+    // θ_j = c_j·(1 − s1_j), calculado a mano.
+    assert!((t[0] - 26.0 * (1.0 - 0.9435)).abs() < 1e-12);
+    assert!((t[8] - 26.5 * (1.0 - 0.8214)).abs() < 1e-12);
+    // m_j = 0.5·c_j y s2.
+    let t = theta(&especies, 0.5, true);
+    assert!((t[9] - 0.5 * 26.0 * (1.0 - 0.7263)).abs() < 1e-12);
+}
+
+#[test]
+fn serpentina_invierte_el_sentido_en_filas_impares_y_deja_vacio_el_excedente() {
+    use reforestation::paso1::patron_serpentina;
+    // Filas de 3: fila 0 = posiciones 0, 1, 2 (izquierda → derecha); fila 1 = 3, 4, 5.
+    // Recorrido: 0, 1, 2, 5, 4, 3. Secuencia [0, 1] → códigos 1, 2, 1, 2, 1 y la última vacía.
+    let malla = Malla::rectangular(3, 2, Disposicion::Completa, 1.0);
+    assert_eq!(patron_serpentina(&malla, &[0, 1], 5), vec![1, 2, 1, 0, 1, 2]);
+}
+
+#[test]
+fn reparar_a_banda_deja_la_serpentina_dentro_de_l_u_sin_tocar_las_vacias() {
+    use reforestation::composicion::Banda;
+    use reforestation::paso1::{patron_serpentina, reparar_a_banda};
+    use reforestation::tabu::DEFAULT_ROW_SEQUENCE;
+    let malla = Malla::para_objetivo(658, 4.189171180993856);
+    let mut phi = patron_serpentina(&malla, DEFAULT_ROW_SEQUENCE, 658);
+    // Con la secuencia de 21 plantas, lechuguilla (idx 0) queda en 31 < L = 38.
+    assert_eq!(conteos(&phi)[1], 31);
+    phi[10] = 0;
+    phi[400] = 0;
+    let banda = Banda {
+        l: vec![38, 177, 38, 38, 45, 35, 66, 58, 78, 24],
+        u: vec![46, 215, 46, 46, 53, 41, 80, 70, 94, 28],
+    };
+    reparar_a_banda(&mut phi, &banda);
+    let d = conteos(&phi);
+    assert_eq!(d[0], 2, "las vacías no cambian");
+    assert!(phi[10] == 0 && phi[400] == 0);
+    for j in 0..10 {
+        assert!(
+            (banda.l[j]..=banda.u[j]).contains(&d[j + 1]),
+            "especie {j} con {} fuera de [{}, {}]",
+            d[j + 1],
+            banda.l[j],
+            banda.u[j]
+        );
+    }
+}
+
+fn params_cortos(semilla: u64) -> reforestation::busqueda_tabu::ParamsTabu {
+    reforestation::busqueda_tabu::ParamsTabu {
+        candidatos: 30,
+        tenure: 10,
+        max_iter: 1_500,
+        max_sin_mejora: 1_500,
+        prob_intercambio: 0.5,
+        semilla,
+    }
+}
+
+#[test]
+fn resolver_paso1_reoptimiza_z_con_la_composicion_fija() {
+    use reforestation::config::Config;
+    use reforestation::datos::Datos;
+    use reforestation::paso1::{resolver_paso1, Instancia};
+    let instancia = Instancia::nueva("1ha", 1.0, &Datos::base(), &Config::default(), 1.0, false);
+    let (fila, phi) = resolver_paso1(&instancia, 1.0, &params_cortos(1));
+    assert!(
+        fila.z_opt <= fila.z_paso1 + 1e-9,
+        "el ajuste C (sólo intercambios) no puede empeorar Z: {} > {}",
+        fila.z_opt,
+        fila.z_paso1
+    );
+    let d = conteos(&phi);
+    assert!(d[1..] == fila.d, "el patrón devuelto tiene la composición D*");
+    assert!(phi.len() == 658, "φ* debe cubrir las 658 posiciones de 1 ha");
+    assert!(
+        fila.d.iter().sum::<usize>() == 658,
+        "Σ D* debe ser D_tot = 658 (φ* debe plantar todas las posiciones de 1 ha)"
+    );
+    let (l, u) = ([38, 177, 38, 38, 45, 35, 66, 58, 78, 24], [46, 215, 46, 46, 53, 41, 80, 70, 94, 28]);
+    assert!(
+        (0..10).all(|j| l[j] <= fila.d[j] && fila.d[j] <= u[j]),
+        "D* (los conteos de φ*) debe quedar en la banda [L, U] de 1 ha y quedó {:?}: φ* es la \
+         serpentina de la socia sin pasar por reparar_a_banda(φ, banda de la instancia)",
+        fila.d
+    );
+    let z = z_total(&phi, &instancia.grafo, &instancia.tabla);
+    assert!(
+        (fila.z_opt - z).abs() < 1e-9,
+        "z_opt debe ser la Z de φ* ({z}) y vale {}",
+        fila.z_opt
+    );
+}
+
+#[test]
+fn resolver_paso1_mejora_la_serpentina_de_la_socia() {
+    use reforestation::config::Config;
+    use reforestation::datos::Datos;
+    use reforestation::paso1::{patron_serpentina, reparar_a_banda, resolver_paso1, Instancia};
+    use reforestation::tabu::DEFAULT_ROW_SEQUENCE;
+    let instancia = Instancia::nueva("1ha", 1.0, &Datos::base(), &Config::default(), 1.0, false);
+    let (fila, _) = resolver_paso1(&instancia, 1.0, &params_cortos(1));
+    let mut socia = patron_serpentina(&instancia.malla, DEFAULT_ROW_SEQUENCE, 658);
+    reparar_a_banda(&mut socia, &instancia.banda);
+    let z_socia = z_total(&socia, &instancia.grafo, &instancia.tabla);
+    assert!(
+        fila.z_opt < z_socia - 1.0,
+        "la búsqueda tabú (paso 1 + ajuste C) debe mejorar la serpentina reparada: z_opt {} \
+         contra {z_socia} (resolver_paso1 no corre buscar())",
+        fila.z_opt
+    );
+}
+
+#[test]
+fn barrido_con_2_gammas_y_2_semillas_produce_4_filas_con_d_en_banda() {
+    use reforestation::config::Config;
+    use reforestation::datos::Datos;
+    use reforestation::paso1::{barrido_gamma, Instancia};
+    let instancia = Instancia::nueva("1ha", 1.0, &Datos::base(), &Config::default(), 1.0, false);
+    let filas = barrido_gamma(&instancia, &[0.0, 1.0], &[1, 2], &params_cortos(0));
+    // 2 γ × 2 semillas = 4 filas; la regla de extensión puede agregar hasta 3 γ más (2 filas c/u).
+    assert!(filas.len() >= 4 && filas.len() <= 10 && filas.len() % 2 == 0, "{}", filas.len());
+    let gammas: Vec<f64> = filas.iter().take(4).map(|f| f.gamma).collect();
+    assert_eq!(gammas, vec![0.0, 0.0, 1.0, 1.0]);
+    assert_eq!(filas.iter().map(|f| f.semilla).take(4).collect::<Vec<_>>(), vec![1, 2, 1, 2]);
+    for f in &filas {
+        assert_eq!(f.instancia, "1ha");
+        assert_eq!(f.map_id, 0);
+        assert_eq!(f.d_tot, 658);
+        assert_eq!(f.d.iter().sum::<usize>(), 658);
+        for j in 0..10 {
+            assert!(instancia.banda.l[j] <= f.d[j] && f.d[j] <= instancia.banda.u[j]);
+        }
+        assert!((f.z_opt_por_planta - f.z_opt / 658.0).abs() < 1e-12);
+        let theta: f64 = (0..10).map(|j| instancia.theta[j] * f.d[j] as f64).sum();
+        let costo: f64 = (0..10).map(|j| instancia.costos[j] * f.d[j] as f64).sum();
+        assert!((f.suma_theta_d - theta).abs() < 1e-9 && (f.suma_c_d - costo).abs() < 1e-9);
+        assert!(f.iter_paso1 > 0 && f.iter_opt > 0);
+    }
+}
+
+#[test]
+fn barrido_agrega_gamma_por_3_mientras_d_cambia_en_el_extremo_hasta_3_veces() {
+    use reforestation::paso1::{barrido_con, FilaPaso1};
+    fn fila(gamma: f64, a: usize) -> FilaPaso1 {
+        FilaPaso1 {
+            gamma,
+            d: [a; 10],
+            ..FilaPaso1::vacia()
+        }
+    }
+    // D cambia siempre: se agregan 100·3, 300·3 y 900·3 y se detiene (3 extensiones).
+    let filas = barrido_con(&[1.0, 10.0, 100.0], &[7], |g, _| fila(g, g as usize));
+    let gammas: Vec<f64> = filas.iter().map(|f| f.gamma).collect();
+    assert_eq!(gammas, vec![1.0, 10.0, 100.0, 300.0, 900.0, 2700.0]);
+    // D estable en los dos γ mayores: no se agrega nada.
+    let filas = barrido_con(&[1.0, 10.0, 100.0], &[7], |g, _| fila(g, if g < 5.0 { 1 } else { 2 }));
+    assert_eq!(filas.len(), 3);
+    // Cambia una vez y luego se estabiliza: una extensión.
+    let filas = barrido_con(&[1.0, 100.0], &[7], |g, _| fila(g, if g < 50.0 { 1 } else { 2 }));
+    assert_eq!(filas.iter().map(|f| f.gamma).collect::<Vec<_>>(), vec![1.0, 100.0, 300.0]);
+}

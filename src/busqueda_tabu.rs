@@ -39,6 +39,9 @@ pub struct Resultado {
     pub iteraciones: usize,
     /// Objetivo del arreglo actual después de cada iteración.
     pub traza: Vec<f64>,
+    /// Mejor objetivo visto hasta cada iteración (curva de convergencia).
+    pub curva: Vec<f64>,
+    pub tiempo_s: f64,
 }
 
 impl Problema<'_> {
@@ -54,6 +57,7 @@ impl Problema<'_> {
 }
 
 pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Resultado {
+    let inicio = std::time::Instant::now();
     let mut phi = inicial;
     // Las posiciones fijas (existentes) nunca se mueven, pero siguen contando como vecinas.
     let libres: Vec<usize> = (0..phi.len()).filter(|&u| !problema.fija[u]).collect();
@@ -62,12 +66,15 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
     let mut sin_mejora = 0;
     let mut actual = problema.objetivo(&phi);
     let mut traza = Vec::new();
+    let mut curva = Vec::new();
     let mut conteos = [0usize; N_ESPECIES + 1];
     for &c in &phi {
         conteos[c as usize] += 1;
     }
     let mut mejor_objetivo = actual;
     let mut mejor_phi = phi.clone();
+    // tabu_hasta[u][s]: iteración hasta la que u no puede volver a tener la especie s.
+    let mut tabu_hasta = vec![[0usize; N_ESPECIES + 1]; phi.len()];
     while iteraciones < params.max_iter && sin_mejora < params.max_sin_mejora && libres.len() > 1
     {
         iteraciones += 1;
@@ -92,6 +99,10 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
                         * delta_reasignacion(&phi, u, b, problema.grafo, problema.tabla)
                         + problema.theta[b as usize - 1]
                         - problema.theta[a as usize - 1];
+                    let es_tabu = tabu_hasta[u][b as usize] > iteraciones;
+                    if !admisible(es_tabu, actual, delta, mejor_objetivo) {
+                        continue;
+                    }
                     (delta, Movimiento::Reasignar { u, b })
                 }
                 _ => {
@@ -101,21 +112,32 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
                     }
                     let delta = problema.gamma
                         * delta_intercambio(&phi, u, v, problema.grafo, problema.tabla);
+                    let es_tabu = tabu_hasta[u][phi[v] as usize] > iteraciones
+                        || tabu_hasta[v][phi[u] as usize] > iteraciones;
+                    if !admisible(es_tabu, actual, delta, mejor_objetivo) {
+                        continue;
+                    }
                     (delta, Movimiento::Intercambiar { u, v })
                 }
             };
-            if elegido.as_ref().map_or(true, |(d, _)| candidato.0 < *d) {
+            if elegido.as_ref().is_none_or(|(d, _)| candidato.0 < *d) {
                 elegido = Some(candidato);
             }
         }
         if let Some((delta, movimiento)) = elegido {
+            let hasta = iteraciones + params.tenure;
             match movimiento {
                 Movimiento::Reasignar { u, b } => {
+                    tabu_hasta[u][phi[u] as usize] = hasta;
                     conteos[phi[u] as usize] -= 1;
                     conteos[b as usize] += 1;
                     phi[u] = b;
                 }
-                Movimiento::Intercambiar { u, v } => phi.swap(u, v),
+                Movimiento::Intercambiar { u, v } => {
+                    tabu_hasta[u][phi[u] as usize] = hasta;
+                    tabu_hasta[v][phi[v] as usize] = hasta;
+                    phi.swap(u, v);
+                }
             }
             actual += delta;
         }
@@ -127,6 +149,7 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
         } else {
             sin_mejora += 1;
         }
+        curva.push(mejor_objetivo);
     }
     Resultado {
         z: z_total(&mejor_phi, problema.grafo, problema.tabla),
@@ -134,11 +157,33 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
         phi: mejor_phi,
         iteraciones,
         traza,
+        curva,
+        tiempo_s: inicio.elapsed().as_secs_f64(),
     }
+}
+
+/// Criterio de aspiración: un movimiento tabú sólo se admite si mejora la mejor solución.
+fn admisible(es_tabu: bool, actual: f64, delta: f64, mejor: f64) -> bool {
+    !es_tabu || actual + delta < mejor - 1e-12
 }
 
 #[derive(Clone, Copy, Debug)]
 enum Movimiento {
     Reasignar { u: usize, b: u8 },
     Intercambiar { u: usize, v: usize },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn aspiracion_admite_un_movimiento_tabu_que_supera_al_mejor() {
+        // actual 10, mejor 9: un tabú con delta −2 llega a 8 < 9 y se admite.
+        assert!(admisible(true, 10.0, -2.0, 9.0));
+        // Un tabú que no supera al mejor (llega a 9.5) se descarta.
+        assert!(!admisible(true, 10.0, -0.5, 9.0));
+        // Un movimiento no tabú siempre es admisible, aunque empeore.
+        assert!(admisible(false, 10.0, 3.0, 9.0));
+    }
 }

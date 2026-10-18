@@ -106,7 +106,7 @@ fn phi_nominal_barajado(semilla: u64) -> Vec<u8> {
     use rand::SeedableRng;
     let delta = [42, 196, 42, 42, 49, 38, 73, 64, 86, 26];
     let mut phi: Vec<u8> = (0..10u8)
-        .flat_map(|j| std::iter::repeat(j + 1).take(delta[j as usize]))
+        .flat_map(|j| std::iter::repeat_n(j + 1, delta[j as usize]))
         .collect();
     phi.shuffle(&mut rand_chacha::ChaCha8Rng::seed_from_u64(semilla));
     phi
@@ -335,4 +335,170 @@ fn aplica_el_mejor_movimiento_aunque_empeore_y_devuelve_el_mejor_visto() {
         "debe devolver la mejor solución vista: objetivo {} contra mínimo de la traza {minimo}",
         resultado.objetivo
     );
+}
+
+/// Malla de 6 posiciones (2 × 3, completa, d = 1) con dos especies, como en la prueba de Z.
+fn instancia_chica() -> (Grafo, TablaCompetencia) {
+    let malla = Malla::rectangular(2, 3, Disposicion::Completa, 1.0);
+    let vecindad = malla.vecindad(2.5, 1e-9);
+    let w = vec![vec![1.0, 0.5], vec![0.5, 1.0]];
+    let tabla = TablaCompetencia::nueva(&w, &[1.0, 2.5], &vecindad.anillos, 1.0, 1e-9);
+    (Grafo::desde(&vecindad), tabla)
+}
+
+#[test]
+fn la_lista_tabu_impide_deshacer_el_ultimo_movimiento() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla) = instancia_chica();
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; 6],
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    // 400 candidatos sobre 6 posiciones: en cada iteración se ven todos los intercambios.
+    let traza = |tenure| {
+        let params = ParamsTabu {
+            candidatos: 400,
+            tenure,
+            max_iter: 60,
+            max_sin_mejora: 60,
+            prob_intercambio: 1.0,
+            semilla: 3,
+        };
+        buscar(&problema, vec![1, 1, 1, 2, 2, 2], &params).traza
+    };
+    let distintos = |t: &[f64]| {
+        let mut v = t.to_vec();
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        v.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+        v.len()
+    };
+    let sin_tabu = traza(0);
+    let con_tabu = traza(3);
+    assert!(
+        distintos(&sin_tabu[20..]) <= 2,
+        "sin lista tabú (tenure 0) la búsqueda debe ciclar entre dos arreglos"
+    );
+    assert!(
+        distintos(&con_tabu[20..]) >= 3,
+        "con tenure 3 una posición no puede volver a su especie anterior en 3 iteraciones, \
+         así que la búsqueda no puede ciclar entre dos arreglos (buscar() ignora `tenure`)"
+    );
+}
+
+#[test]
+fn la_lista_tabu_tambien_aplica_a_las_reasignaciones() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla) = instancia_chica();
+    let mut l = vec![0; 10];
+    let mut u = vec![0; 10];
+    (l[0], u[0], l[1], u[1]) = (2, 4, 2, 4);
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; 6],
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::Banda { l, u },
+    };
+    // Sólo reasignaciones (prob_intercambio = 0) y todas vistas en cada iteración.
+    let traza = |tenure| {
+        let params = ParamsTabu {
+            candidatos: 400,
+            tenure,
+            max_iter: 60,
+            max_sin_mejora: 60,
+            prob_intercambio: 0.0,
+            semilla: 3,
+        };
+        buscar(&problema, vec![1, 1, 1, 2, 2, 2], &params).traza
+    };
+    let distintos = |t: &[f64]| {
+        let mut v = t.to_vec();
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        v.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+        v.len()
+    };
+    assert!(
+        distintos(&traza(0)[20..]) <= 2,
+        "sin lista tabú las reasignaciones deben ciclar entre dos arreglos"
+    );
+    assert!(
+        distintos(&traza(3)[20..]) >= 3,
+        "con tenure 3 una posición reasignada no puede volver a su especie anterior en 3 \
+         iteraciones (las reasignaciones ignoran la lista tabú)"
+    );
+}
+
+#[test]
+fn reporta_tiempo_y_curva_del_mejor_por_iteracion() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; n],
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    let params = ParamsTabu {
+        candidatos: 20,
+        tenure: 10,
+        max_iter: 500,
+        max_sin_mejora: 500,
+        prob_intercambio: 1.0,
+        semilla: 4,
+    };
+    let resultado = buscar(&problema, phi_nominal_barajado(2), &params);
+    assert!(resultado.tiempo_s > 0.0, "debe medir el tiempo de ejecución");
+    let curva = &resultado.curva;
+    assert!(curva.len() == resultado.iteraciones, "una entrada de la curva por iteración");
+    assert!(
+        curva.windows(2).all(|par| par[1] <= par[0]),
+        "la curva del mejor objetivo nunca sube"
+    );
+    assert!((curva[curva.len() - 1] - resultado.objetivo).abs() < 1e-6);
+}
+
+#[test]
+fn la_banda_nunca_se_viola_en_una_busqueda_mixta() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    let theta = [1.469, 1.0738, 4.563, 1.2558, 1.3104, 2.1294, 0.7632, 2.052, 4.7329, 3.0082];
+    let l = vec![38, 177, 38, 38, 45, 35, 66, 58, 78, 24];
+    let u = vec![46, 215, 46, 46, 53, 41, 80, 70, 94, 28];
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; n],
+        gamma: 1.0,
+        theta,
+        restriccion: Restriccion::Banda { l: l.clone(), u: u.clone() },
+    };
+    for semilla in 1..=5 {
+        let params = ParamsTabu {
+            candidatos: 30,
+            tenure: 10,
+            max_iter: 2_000,
+            max_sin_mejora: 2_000,
+            prob_intercambio: 0.5,
+            semilla,
+        };
+        let resultado = buscar(&problema, phi_nominal_barajado(semilla), &params);
+        let d = conteos(&resultado.phi);
+        assert_eq!(d.iter().sum::<usize>(), 658);
+        for j in 0..10 {
+            assert!(
+                (l[j]..=u[j]).contains(&d[j + 1]),
+                "semilla {semilla}: especie {j} con {} fuera de [{}, {}]",
+                d[j + 1],
+                l[j],
+                u[j]
+            );
+        }
+    }
 }

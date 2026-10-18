@@ -23,7 +23,11 @@ fn reto(args: &[&str]) -> std::process::Output {
 fn datos_escribe_los_csv_del_reto() {
     let dir = dir_temporal("datos");
     let salida = reto(&["datos", "--datos", dir.to_str().unwrap()]);
-    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
     assert!(
         dir.join("especies.csv").exists(),
         "el binario `reto datos --datos DIR` no escribió DIR/especies.csv"
@@ -48,16 +52,24 @@ fn opcion_sin_valor_termina_con_error_sin_escribir() {
         .current_dir(&raiz)
         .output()
         .unwrap();
-    assert!(!salida.status.success(), "`reto datos --datos` (sin valor) debería fallar");
+    assert!(
+        !salida.status.success(),
+        "`reto datos --datos` (sin valor) debería fallar"
+    );
     assert!(String::from_utf8_lossy(&salida.stderr).contains("--datos"));
-    assert!(!raiz.join("data").exists(), "no debe escribir en la carpeta por defecto");
+    assert!(
+        !raiz.join("data").exists(),
+        "no debe escribir en la carpeta por defecto"
+    );
 }
 
 #[test]
 fn opcion_desconocida_termina_con_error_sin_escribir() {
     let datos = dir_temporal("opcion_desconocida");
     let resultados = datos.join("resultados");
-    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
     let salida = reto(&[
         "malla",
         "--datos",
@@ -67,16 +79,24 @@ fn opcion_desconocida_termina_con_error_sin_escribir() {
         "--sett",
         "kappa=0.4",
     ]);
-    assert!(!salida.status.success(), "`--sett` (typo de --set) debería fallar");
+    assert!(
+        !salida.status.success(),
+        "`--sett` (typo de --set) debería fallar"
+    );
     assert!(String::from_utf8_lossy(&salida.stderr).contains("--sett"));
-    assert!(!resultados.exists(), "no debe escribir resultados con opciones inválidas");
+    assert!(
+        !resultados.exists(),
+        "no debe escribir resultados con opciones inválidas"
+    );
 }
 
 #[test]
 fn malla_exporta_resumen_anillos_y_w() {
     let datos = dir_temporal("malla_datos");
     let resultados = dir_temporal("malla_resultados");
-    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
     let salida = reto(&[
         "malla",
         "--datos",
@@ -84,7 +104,11 @@ fn malla_exporta_resumen_anillos_y_w() {
         "--resultados",
         resultados.to_str().unwrap(),
     ]);
-    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
 
     let resumen = std::fs::read_to_string(resultados.join("malla_resumen.csv")).unwrap();
     assert_eq!(resumen.lines().count(), 32);
@@ -118,7 +142,9 @@ fn malla_exporta_resumen_anillos_y_w() {
 fn set_factor_radios_1_25_agrega_dos_anillos() {
     let datos = dir_temporal("set_datos");
     let resultados = dir_temporal("set_resultados");
-    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
     let salida = reto(&[
         "malla",
         "--datos",
@@ -128,7 +154,11 @@ fn set_factor_radios_1_25_agrega_dos_anillos() {
         "--set",
         "factor_radios=1.25",
     ]);
-    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
     let anillos = std::fs::read_to_string(resultados.join("malla_anillos.csv")).unwrap();
     assert_eq!(anillos.lines().count(), 1 + 31 * 5);
 }
@@ -137,7 +167,11 @@ fn set_factor_radios_1_25_agrega_dos_anillos() {
 fn sin_config_lee_config_default_json_del_directorio_actual() {
     let raiz = dir_temporal("config_default");
     std::fs::create_dir_all(raiz.join("config")).unwrap();
-    std::fs::write(raiz.join("config/default.json"), r#"{"factor_radios": 1.25}"#).unwrap();
+    std::fs::write(
+        raiz.join("config/default.json"),
+        r#"{"factor_radios": 1.25}"#,
+    )
+    .unwrap();
     let corre = |args: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_reto"))
             .args(args)
@@ -147,7 +181,11 @@ fn sin_config_lee_config_default_json_del_directorio_actual() {
     };
     assert!(corre(&["datos"]).status.success());
     let salida = corre(&["malla"]);
-    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
     let anillos = std::fs::read_to_string(raiz.join("results/malla_anillos.csv")).unwrap();
     assert_eq!(
         anillos.lines().count(),
@@ -159,7 +197,9 @@ fn sin_config_lee_config_default_json_del_directorio_actual() {
 #[test]
 fn config_json_cambia_kappa_de_w() {
     let datos = dir_temporal("config_datos");
-    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
     let config = datos.join("config.json");
     std::fs::write(&config, r#"{"kappa": 0.4}"#).unwrap();
     let salida = reto(&[
@@ -171,7 +211,11 @@ fn config_json_cambia_kappa_de_w() {
         "--config",
         config.to_str().unwrap(),
     ]);
-    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
     let w = std::fs::read_to_string(datos.join("W.csv")).unwrap();
     let fila_lechuguilla: Vec<&str> = w.lines().nth(1).unwrap().split(',').collect();
     // κ·S con S(lechuguilla, salmiana) = 0.93400 (calculado a mano): 0.4 · 0.934 = 0.3736
@@ -185,7 +229,9 @@ fn config_json_cambia_kappa_de_w() {
 #[test]
 fn la_validacion_corre_despues_de_todos_los_set() {
     let datos = dir_temporal("validar_al_final");
-    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
     let config = datos.join("config.json");
     std::fs::write(&config, r#"{"epsilon": 1.5, "kappa": -1}"#).unwrap();
     let salida = reto(&[
@@ -208,8 +254,7 @@ fn la_validacion_corre_despues_de_todos_los_set() {
     );
 }
 
-const TABU_CORTO: &str =
-    r#"tabu={"candidatos":20,"tenure":5,"max_iter":200,"max_sin_mejora":200,"prob_intercambio":0.5}"#;
+const TABU_CORTO: &str = r#"tabu={"candidatos":20,"tenure":5,"max_iter":200,"max_sin_mejora":200,"prob_intercambio":0.5}"#;
 
 fn encabezado_de(dir: &std::path::Path, archivo: &str) -> String {
     let texto = std::fs::read_to_string(dir.join(archivo))
@@ -221,7 +266,9 @@ fn encabezado_de(dir: &std::path::Path, archivo: &str) -> String {
 fn paso1_escribe_los_csv_con_los_encabezados_exactos() {
     let datos = dir_temporal("paso1_datos");
     let resultados = dir_temporal("paso1_resultados");
-    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
     let salida = reto(&[
         "paso1",
         "--datos",
@@ -237,7 +284,11 @@ fn paso1_escribe_los_csv_con_los_encabezados_exactos() {
         "--set",
         "n_semillas=2",
     ]);
-    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
     let d: String = (0..10).map(|j| format!("D_{j},")).collect();
     assert_eq!(
         encabezado_de(&resultados, "paso1_barrido_gamma.csv"),
@@ -254,7 +305,12 @@ fn paso1_escribe_los_csv_con_los_encabezados_exactos() {
         )
         .replace(",,", ",")
     );
-    let cols = |p: &str| (0..10).map(|j| format!("{p}_{j}")).collect::<Vec<_>>().join(",");
+    let cols = |p: &str| {
+        (0..10)
+            .map(|j| format!("{p}_{j}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    };
     assert_eq!(
         encabezado_de(&resultados, "paso1_composicion.csv"),
         format!(
@@ -274,7 +330,10 @@ fn paso1_escribe_los_csv_con_los_encabezados_exactos() {
         "iteracion,actual,mejor"
     );
     let barrido = std::fs::read_to_string(resultados.join("paso1_barrido_gamma.csv")).unwrap();
-    assert!(barrido.lines().count() >= 5, "2 γ × 2 semillas + encabezado");
+    assert!(
+        barrido.lines().count() >= 5,
+        "2 γ × 2 semillas + encabezado"
+    );
     let patron = std::fs::read_to_string(resultados.join("paso1_patron_1ha.csv")).unwrap();
     assert_eq!(patron.lines().count(), 1 + 658);
     let comp = std::fs::read_to_string(resultados.join("paso1_composicion.csv")).unwrap();
@@ -286,7 +345,9 @@ fn paso1_escribe_los_csv_con_los_encabezados_exactos() {
 fn paso1_solo_gamma_star_corre_un_solo_gamma_y_valida_despues_de_set() {
     let datos = dir_temporal("paso1s_datos");
     let resultados = dir_temporal("paso1s_resultados");
-    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
     let base = |extra: &[&'static str]| {
         let mut args = vec![
             "paso1",
@@ -306,9 +367,19 @@ fn paso1_solo_gamma_star_corre_un_solo_gamma_y_valida_despues_de_set() {
         reto(&args)
     };
     let salida = base(&[]);
-    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
-    assert!(!resultados.join("paso1_resumen_gamma.csv").exists(), "no pisa el barrido");
-    assert!(!resultados.join("paso1_barrido_gamma.csv").exists(), "no pisa el barrido");
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
+    assert!(
+        !resultados.join("paso1_resumen_gamma.csv").exists(),
+        "no pisa el barrido"
+    );
+    assert!(
+        !resultados.join("paso1_barrido_gamma.csv").exists(),
+        "no pisa el barrido"
+    );
     let estrella = std::fs::read_to_string(resultados.join("paso1_gamma_star.csv")).unwrap();
     assert_eq!(estrella.lines().count(), 3, "γ* × 2 semillas");
     // Un --set inválido (n_semillas=0) falla aunque venga después de los demás.
@@ -321,7 +392,9 @@ fn paso1_solo_gamma_star_corre_un_solo_gamma_y_valida_despues_de_set() {
 fn montecarlo_escribe_escenarios_y_resumenes() {
     let datos = dir_temporal("mc_datos");
     let resultados = dir_temporal("mc_resultados");
-    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
     let comunes = |sub: &'static str| {
         vec![
             sub,
@@ -346,7 +419,11 @@ fn montecarlo_escribe_escenarios_y_resumenes() {
     let mut args = comunes("montecarlo");
     args.extend(["--set", "n_escenarios=20"]);
     let salida = reto(&args);
-    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
     let x = std::fs::read_to_string(resultados.join("escenarios_X_1ha.csv")).unwrap();
     assert_eq!(x.lines().count(), 21);
     assert!(x.starts_with("omega,T,X_0,"));

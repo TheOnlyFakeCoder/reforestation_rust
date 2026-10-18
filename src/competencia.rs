@@ -154,7 +154,11 @@ mod tests {
         let rango = |pares: Vec<(usize, usize)>, lo: f64, hi: f64| {
             for (j, k) in pares {
                 let v = r2(w[j][k]);
-                assert!(v >= lo && v <= hi, "w[{j}][{k}] = {} fuera de [{lo}, {hi}]", w[j][k]);
+                assert!(
+                    v >= lo && v <= hi,
+                    "w[{j}][{k}] = {} fuera de [{lo}, {hi}]",
+                    w[j][k]
+                );
             }
         };
         let pares = |a: std::ops::Range<usize>, b: std::ops::Range<usize>| {

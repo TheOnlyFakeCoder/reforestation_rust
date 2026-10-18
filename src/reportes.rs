@@ -218,8 +218,9 @@ fn media(xs: impl Iterator<Item = f64>) -> f64 {
 /// Una fila por instancia × γ × semilla.
 pub fn escribir_barrido_gamma(path: &Path, filas: &[FilaPaso1]) -> Result<(), Box<dyn Error>> {
     let mut csv = csv::Writer::from_path(path)?;
-    let mut encabezado: Vec<String> =
-        ["instancia", "map_id", "gamma", "semilla"].map(String::from).to_vec();
+    let mut encabezado: Vec<String> = ["instancia", "map_id", "gamma", "semilla"]
+        .map(String::from)
+        .to_vec();
     encabezado.extend(columnas("D"));
     encabezado.extend(
         [
@@ -285,21 +286,38 @@ pub fn escribir_resumen_gamma(path: &Path, filas: &[FilaPaso1]) -> Result<(), Bo
     csv.write_record(&encabezado)?;
     let mut grupos: Vec<(&str, f64)> = Vec::new();
     for f in filas {
-        if !grupos.iter().any(|&(i, g)| i == f.instancia && g == f.gamma) {
+        if !grupos
+            .iter()
+            .any(|&(i, g)| i == f.instancia && g == f.gamma)
+        {
             grupos.push((&f.instancia, f.gamma));
         }
     }
     for (instancia, gamma) in grupos {
-        let grupo = || filas.iter().filter(move |f| f.instancia == instancia && f.gamma == gamma);
+        let grupo = || {
+            filas
+                .iter()
+                .filter(move |f| f.instancia == instancia && f.gamma == gamma)
+        };
         let mejor = mejor_fila(grupo()).expect("grupo no vacío");
-        let mut r = vec![instancia.to_string(), mejor.map_id.to_string(), gamma.to_string()];
+        let mut r = vec![
+            instancia.to_string(),
+            mejor.map_id.to_string(),
+            gamma.to_string(),
+        ];
         r.extend(mejor.d.iter().map(|x| x.to_string()));
         r.extend([
             mejor.suma_theta_d.to_string(),
             mejor.suma_c_d.to_string(),
             media(grupo().map(|f| f.z_opt)).to_string(),
-            grupo().map(|f| f.z_opt).fold(f64::INFINITY, f64::min).to_string(),
-            grupo().map(|f| f.z_opt).fold(f64::NEG_INFINITY, f64::max).to_string(),
+            grupo()
+                .map(|f| f.z_opt)
+                .fold(f64::INFINITY, f64::min)
+                .to_string(),
+            grupo()
+                .map(|f| f.z_opt)
+                .fold(f64::NEG_INFINITY, f64::max)
+                .to_string(),
             media(grupo().map(|f| f.z_opt_por_planta)).to_string(),
             media(grupo().map(|f| f.tiempo_paso1_s + f.tiempo_opt_s)).to_string(),
             media(grupo().map(|f| (f.iter_paso1 + f.iter_opt) as f64)).to_string(),
@@ -316,8 +334,9 @@ pub fn escribir_composicion_paso1(
     elegidas: &[(&Instancia, &FilaPaso1)],
 ) -> Result<(), Box<dyn Error>> {
     let mut csv = csv::Writer::from_path(path)?;
-    let mut encabezado: Vec<String> =
-        ["instancia", "map_id", "area_ha", "d_tot"].map(String::from).to_vec();
+    let mut encabezado: Vec<String> = ["instancia", "map_id", "area_ha", "d_tot"]
+        .map(String::from)
+        .to_vec();
     for prefijo in ["D", "Dnom", "L", "U"] {
         encabezado.extend(columnas(prefijo));
     }
@@ -391,14 +410,24 @@ mod tests {
         );
         let p1 = filas.iter().find(|f| f.map_id == Some(27)).unwrap();
         assert_eq!(
-            (p1.columnas, p1.filas, p1.n_pos, p1.objetivo, p1.excedente, p1.d_tot),
+            (
+                p1.columnas,
+                p1.filas,
+                p1.n_pos,
+                p1.objetivo,
+                p1.excedente,
+                p1.d_tot
+            ),
             (26, 33, 842, 842, 0, 842)
         );
         assert!((p1.ancho_m - 26.0 * crate::config::Config::default().d).abs() < 1e-9);
         assert_eq!(p1.pares.len(), 3);
         assert_eq!(p1.anillos_m.len(), 3);
         let map12 = filas.iter().find(|f| f.map_id == Some(12)).unwrap();
-        assert_eq!((map12.n_pos, map12.objetivo, map12.excedente, map12.d_tot), (969, 967, 2, 967));
+        assert_eq!(
+            (map12.n_pos, map12.objetivo, map12.excedente, map12.d_tot),
+            (969, 967, 2, 967)
+        );
     }
 
     fn dir_temporal(nombre: &str) -> std::path::PathBuf {
@@ -453,7 +482,10 @@ mod tests {
         escribir_alcance(&path, &Datos::base().especies, &config, &anillos).unwrap();
         let texto = std::fs::read_to_string(&path).unwrap();
         let lineas: Vec<Vec<&str>> = texto.lines().map(|l| l.split(',').collect()).collect();
-        assert_eq!(lineas[0], ["R_j_d", "R_k_d", "R_jk_d", "anillo", "delta_sobre_d", "h"]);
+        assert_eq!(
+            lineas[0],
+            ["R_j_d", "R_k_d", "R_jk_d", "anillo", "delta_sobre_d", "h"]
+        );
         // Clases de radio 1, 2 y 2.5 (·d): 6 pares × 3 anillos.
         assert_eq!(lineas.len(), 1 + 6 * 3);
         let h = |rj: &str, rk: &str, anillo: &str| -> f64 {
@@ -483,7 +515,14 @@ mod tests {
         assert_eq!(lineas.len(), 7);
         assert_eq!(
             lineas[0],
-            ["instancia", "map_id", "anillo", "distancia_m", "distancia_sobre_d", "pares"]
+            [
+                "instancia",
+                "map_id",
+                "anillo",
+                "distancia_m",
+                "distancia_sobre_d",
+                "pares"
+            ]
         );
         assert_eq!(&lineas[2][..3], ["1ha", "", "2"]);
         let sobre_d: f64 = lineas[2][4].parse().unwrap();

@@ -106,12 +106,7 @@ impl Malla {
     /// Rectángulo de `filas` filas con `columnas` posiciones en las filas pares; las impares
     /// tienen c (Completa) o c − 1 (Alterna). Los centros quedan a d/2 del borde izquierdo en
     /// filas pares, a d en impares, y a h/2 de los bordes inferior y superior.
-    pub fn rectangular(
-        columnas: usize,
-        filas: usize,
-        disposicion: Disposicion,
-        d: f64,
-    ) -> Malla {
+    pub fn rectangular(columnas: usize, filas: usize, disposicion: Disposicion, d: f64) -> Malla {
         let (en_impares, ancho) = match disposicion {
             Disposicion::Completa => (columnas, (columnas as f64 + 0.5) * d),
             Disposicion::Alterna => (columnas - 1, columnas as f64 * d),
@@ -160,19 +155,20 @@ impl Malla {
             for filas in 2..=limite {
                 for disposicion in [Disposicion::Alterna, Disposicion::Completa] {
                     let (n_pos, ancho) = match disposicion {
-                        Disposicion::Completa => {
-                            (columnas * filas, (columnas as f64 + 0.5) * d)
-                        }
-                        Disposicion::Alterna => {
-                            (columnas * filas - filas / 2, columnas as f64 * d)
-                        }
+                        Disposicion::Completa => (columnas * filas, (columnas as f64 + 0.5) * d),
+                        Disposicion::Alterna => (columnas * filas - filas / 2, columnas as f64 * d),
                     };
                     let proporcion = ancho / (filas as f64 * h);
                     if n_pos < objetivo || !(0.8..=1.25).contains(&proporcion) {
                         continue;
                     }
-                    let candidato =
-                        (n_pos - objetivo, (proporcion - 1.0).abs(), columnas, filas, disposicion);
+                    let candidato = (
+                        n_pos - objetivo,
+                        (proporcion - 1.0).abs(),
+                        columnas,
+                        filas,
+                        disposicion,
+                    );
                     let es_mejor = match &mejor {
                         None => true,
                         Some(m) => {
@@ -301,11 +297,22 @@ mod tests {
     fn posiciones_quedan_dentro_del_cuadrado_a_medio_paso_del_borde() {
         let malla = Malla::cuadrada(1.0, D);
         assert!((malla.lado - 100.0).abs() < 1e-9);
-        let min_x = malla.posiciones.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
-        let min_y = malla.posiciones.iter().map(|p| p.y).fold(f64::INFINITY, f64::min);
+        let min_x = malla
+            .posiciones
+            .iter()
+            .map(|p| p.x)
+            .fold(f64::INFINITY, f64::min);
+        let min_y = malla
+            .posiciones
+            .iter()
+            .map(|p| p.y)
+            .fold(f64::INFINITY, f64::min);
         assert!((min_x - D / 2.0).abs() < 1e-9);
         assert!((min_y - D * 3f64.sqrt() / 4.0).abs() < 1e-9);
-        assert!(malla.posiciones.iter().all(|p| p.x <= 100.0 + 1e-9 && p.y <= 100.0 + 1e-9));
+        assert!(malla
+            .posiciones
+            .iter()
+            .all(|p| p.x <= 100.0 + 1e-9 && p.y <= 100.0 + 1e-9));
     }
 
     #[test]
@@ -324,7 +331,11 @@ mod tests {
         let distancia_al_centro =
             |u: usize| (malla.posiciones[u].x - centro).hypot(malla.posiciones[u].y - centro);
         (0..malla.len())
-            .min_by(|&a, &b| distancia_al_centro(a).partial_cmp(&distancia_al_centro(b)).unwrap())
+            .min_by(|&a, &b| {
+                distancia_al_centro(a)
+                    .partial_cmp(&distancia_al_centro(b))
+                    .unwrap()
+            })
             .unwrap()
     }
 
@@ -345,7 +356,10 @@ mod tests {
         for (anillo, esperado) in vecindad.anillos.iter().zip(esperados) {
             assert!((anillo - esperado).abs() < 1e-6);
         }
-        assert_eq!(conteo_por_anillo(&vecindad, nodo_interior(&malla)), vec![6, 6, 6]);
+        assert_eq!(
+            conteo_por_anillo(&vecindad, nodo_interior(&malla)),
+            vec![6, 6, 6]
+        );
         assert_eq!(vecindad.max_vecinos(), 18);
     }
 
@@ -358,7 +372,10 @@ mod tests {
         for (anillo, esperado) in vecindad.anillos.iter().zip(esperados) {
             assert!((anillo / D - esperado).abs() < 1e-6);
         }
-        assert_eq!(conteo_por_anillo(&vecindad, nodo_interior(&malla)), vec![6, 6, 6, 12, 6]);
+        assert_eq!(
+            conteo_por_anillo(&vecindad, nodo_interior(&malla)),
+            vec![6, 6, 6, 12, 6]
+        );
     }
 
     #[test]
@@ -415,12 +432,20 @@ mod tests {
         for (objetivo, n_pos, columnas, filas, disposicion) in casos {
             let malla = Malla::para_objetivo(objetivo, D);
             assert_eq!(
-                (malla.len(), malla.columnas, malla.filas(), malla.disposicion),
+                (
+                    malla.len(),
+                    malla.columnas,
+                    malla.filas(),
+                    malla.disposicion
+                ),
                 (n_pos, columnas, filas, disposicion),
                 "objetivo {objetivo}"
             );
             let proporcion = malla.ancho / malla.alto;
-            assert!((0.8..=1.25).contains(&proporcion), "objetivo {objetivo}: {proporcion}");
+            assert!(
+                (0.8..=1.25).contains(&proporcion),
+                "objetivo {objetivo}: {proporcion}"
+            );
             let h = D * SENO_60;
             for p in &malla.posiciones {
                 assert!(p.x >= D / 2.0 - 1e-9 && p.x <= malla.ancho - D / 2.0 + 1e-9);

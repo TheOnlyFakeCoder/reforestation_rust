@@ -81,7 +81,9 @@ pub fn construir_inicial(
         }
     }
     let mut total: usize = cuenta[1..].iter().sum();
-    let mut vacias = (0..phi.len()).filter(|&u| !fija[u] && phi[u] == 0).collect::<Vec<_>>();
+    let mut vacias = (0..phi.len())
+        .filter(|&u| !fija[u] && phi[u] == 0)
+        .collect::<Vec<_>>();
     vacias.reverse();
     while total < m {
         let Some(j) = (0..N_ESPECIES)
@@ -134,7 +136,10 @@ pub fn resolver_escenario(
         theta: [0.0; N_ESPECIES],
         restriccion: Restriccion::Cuotas { n },
     };
-    let params = ParamsTabu { prob_intercambio: PROB_INTERCAMBIO_CUOTAS, ..*params };
+    let params = ParamsTabu {
+        prob_intercambio: PROB_INTERCAMBIO_CUOTAS,
+        ..*params
+    };
     let r = buscar(&problema, inicial, &params);
     let plantas = escenario.t + m;
     let z = z_total(&r.phi, &instancia.grafo, &instancia.tabla);
@@ -175,7 +180,9 @@ pub fn correr_instancia(
     params: &ParamsTabu,
 ) -> (Vec<FilaPaso3>, Vec<u8>, Escenario) {
     let inst = entrada.instancia;
-    let hilos = std::thread::available_parallelism().map_or(1, |n| n.get()).min(n_omega.max(1));
+    let hilos = std::thread::available_parallelism()
+        .map_or(1, |n| n.get())
+        .min(n_omega.max(1));
     let mut salida: Vec<Option<(FilaPaso3, Vec<u8>)>> = vec![None; n_omega];
     let trozo = n_omega.div_ceil(hilos).max(1);
     std::thread::scope(|s| {
@@ -195,8 +202,14 @@ pub fn correr_instancia(
                         semilla: entrada.semilla.wrapping_add(omega as u64),
                         ..*params
                     };
-                    *hueco =
-                        Some(resolver_escenario(inst, entrada.base, &entrada.q, &entrada.d, &e, &p));
+                    *hueco = Some(resolver_escenario(
+                        inst,
+                        entrada.base,
+                        &entrada.q,
+                        &entrada.d,
+                        &e,
+                        &p,
+                    ));
                 }
             });
         }
@@ -210,7 +223,14 @@ pub fn correr_instancia(
         }
         filas.push(fila);
     }
-    let e0 = generar(inst.malla.len(), inst.area, inst.map_id, 0, entrada.semilla, entrada.mc);
+    let e0 = generar(
+        inst.malla.len(),
+        inst.area,
+        inst.map_id,
+        0,
+        entrada.semilla,
+        entrada.mc,
+    );
     (filas, phi0, e0)
 }
 
@@ -237,11 +257,14 @@ pub fn leer_compra(
         csv::Reader::from_path(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let enc = lector.headers()?.clone();
     let col = |nombre: &str| {
-        enc.iter().position(|h| h == nombre).ok_or_else(|| format!("falta la columna {nombre}"))
+        enc.iter()
+            .position(|h| h == nombre)
+            .ok_or_else(|| format!("falta la columna {nombre}"))
     };
     let (ci, ce, cp) = (col("instancia")?, col("epsilon")?, col("pi_factor")?);
-    let cq: Vec<usize> =
-        (0..N_ESPECIES).map(|j| col(&format!("q_{j}"))).collect::<Result<_, _>>()?;
+    let cq: Vec<usize> = (0..N_ESPECIES)
+        .map(|j| col(&format!("q_{j}")))
+        .collect::<Result<_, _>>()?;
     for registro in lector.records() {
         let r = registro?;
         if &r[ci] == instancia
@@ -256,6 +279,9 @@ pub fn leer_compra(
             return Ok(q);
         }
     }
-    Err(format!("{}: sin fila para {instancia} (e={epsilon}, pi={pi_factor})", path.display())
-        .into())
+    Err(format!(
+        "{}: sin fila para {instancia} (e={epsilon}, pi={pi_factor})",
+        path.display()
+    )
+    .into())
 }

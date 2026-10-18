@@ -291,7 +291,11 @@ pub fn patron_serpentina(malla: &Malla, secuencia: &[usize], d_tot: usize) -> Ve
 /// θ_j = m_j·(1 − s_j) con m_j = m_escala·c_j y s_j = s1_j (o s2_j).
 pub fn theta(especies: &[Especie], m_escala: f64, usar_s2: bool) -> [f64; N_ESPECIES] {
     std::array::from_fn(|j| {
-        let s = if usar_s2 { especies[j].s2 } else { especies[j].s1 };
+        let s = if usar_s2 {
+            especies[j].s2
+        } else {
+            especies[j].s1
+        };
         m_escala * especies[j].c * (1.0 - s)
     })
 }

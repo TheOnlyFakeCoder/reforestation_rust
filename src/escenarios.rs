@@ -86,7 +86,13 @@ pub fn generar(
             posiciones.push((it.next().expect("hay T posiciones"), j as u8));
         }
     }
-    Escenario { omega, rho, t, x, posiciones }
+    Escenario {
+        omega,
+        rho,
+        t,
+        x,
+        posiciones,
+    }
 }
 
 /// Media y desviación estándar muestral (n − 1).
@@ -149,7 +155,10 @@ pub fn resumir(
     let n = escenarios.len() as f64;
     let especies = (0..N_ESPECIES)
         .map(|j| {
-            let c: Vec<f64> = escenarios.iter().map(|e| d[j] as f64 - e.x[j] as f64).collect();
+            let c: Vec<f64> = escenarios
+                .iter()
+                .map(|e| d[j] as f64 - e.x[j] as f64)
+                .collect();
             let (media, sd) = estadisticos(&c);
             let mitad = 1.96 * sd / n.sqrt();
             FilaEspecie {
@@ -168,7 +177,9 @@ pub fn resumir(
     let costo: Vec<f64> = escenarios
         .iter()
         .map(|e| {
-            (0..N_ESPECIES).map(|j| costos[j] * (d[j] as f64 - e.x[j] as f64).max(0.0)).sum()
+            (0..N_ESPECIES)
+                .map(|j| costos[j] * (d[j] as f64 - e.x[j] as f64).max(0.0))
+                .sum()
         })
         .collect();
     let (costo_esperado, costo_sd) = estadisticos(&costo);

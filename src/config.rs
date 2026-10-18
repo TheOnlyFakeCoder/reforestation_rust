@@ -128,7 +128,10 @@ impl Config {
             return Err(format!("d debe ser > 0 (vale {})", self.d));
         }
         if no_positivo(self.tolerancia) {
-            return Err(format!("tolerancia debe ser > 0 (vale {})", self.tolerancia));
+            return Err(format!(
+                "tolerancia debe ser > 0 (vale {})",
+                self.tolerancia
+            ));
         }
         // Los anillos más cercanos (√3·d y 2d) distan 0.27·d; una tolerancia mayor los juntaría.
         if self.tolerancia >= 0.01 * self.d {
@@ -139,19 +142,31 @@ impl Config {
             ));
         }
         if !(0.0..1.0).contains(&self.epsilon) {
-            return Err(format!("epsilon debe estar en [0, 1) (vale {})", self.epsilon));
+            return Err(format!(
+                "epsilon debe estar en [0, 1) (vale {})",
+                self.epsilon
+            ));
         }
         if self.kappa.is_nan() || self.kappa < 0.0 {
             return Err(format!("kappa debe ser ≥ 0 (vale {})", self.kappa));
         }
         if no_positivo(self.factor_radios) {
-            return Err(format!("factor_radios debe ser > 0 (vale {})", self.factor_radios));
+            return Err(format!(
+                "factor_radios debe ser > 0 (vale {})",
+                self.factor_radios
+            ));
         }
         if self.gammas.iter().any(|g| g.is_nan() || *g < 0.0) {
-            return Err(format!("gammas debe tener valores ≥ 0 (vale {:?})", self.gammas));
+            return Err(format!(
+                "gammas debe tener valores ≥ 0 (vale {:?})",
+                self.gammas
+            ));
         }
         if self.gamma_star.is_nan() || self.gamma_star < 0.0 {
-            return Err(format!("gamma_star debe ser ≥ 0 (vale {})", self.gamma_star));
+            return Err(format!(
+                "gamma_star debe ser ≥ 0 (vale {})",
+                self.gamma_star
+            ));
         }
         if self.n_semillas < 1 {
             return Err("n_semillas debe ser ≥ 1".to_string());
@@ -180,7 +195,9 @@ impl Config {
     /// los `--set` puedan corregir un archivo inválido. Si algo falla, nada cambia.
     pub fn aplicar_todas(&mut self, asignaciones: &[&str]) -> Result<(), String> {
         let mut json = serde_json::to_value(&*self).map_err(|e| e.to_string())?;
-        let objeto = json.as_object_mut().expect("Config se serializa como objeto");
+        let objeto = json
+            .as_object_mut()
+            .expect("Config se serializa como objeto");
         for asignacion in asignaciones {
             let (clave, valor) = asignacion
                 .split_once('=')
@@ -308,9 +325,15 @@ mod tests {
 
     #[test]
     fn validar_rechaza_gamma_negativa_semillas_cero_y_tabu_invalido() {
-        let c = Config { gammas: vec![0.0, -1.0], ..Config::default() };
+        let c = Config {
+            gammas: vec![0.0, -1.0],
+            ..Config::default()
+        };
         assert!(c.validar().unwrap_err().contains("gammas"));
-        let c = Config { n_semillas: 0, ..Config::default() };
+        let c = Config {
+            n_semillas: 0,
+            ..Config::default()
+        };
         assert!(c.validar().unwrap_err().contains("n_semillas"));
         let mut c = Config::default();
         c.tabu.tenure = 0;

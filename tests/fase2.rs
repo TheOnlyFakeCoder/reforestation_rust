@@ -59,7 +59,12 @@ fn delta_coincide_con_recalculo_en_10000_movimientos() {
         } else {
             // Uno de cada cinco intercambios es entre vecinos, para cubrir el par (u, v) mismo.
             let v = if k % 10 == 1 {
-                match grafo.vecinos(u).iter().map(|x| x.pos as usize).find(|&v| !fija[v]) {
+                match grafo
+                    .vecinos(u)
+                    .iter()
+                    .map(|x| x.pos as usize)
+                    .find(|&v| !fija[v])
+                {
                     Some(v) => {
                         adyacentes += 1;
                         v
@@ -212,7 +217,9 @@ fn con_gamma_cero_la_banda_lleva_al_optimo_lineal_de_mortalidad() {
     use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
     let (grafo, tabla, n) = instancia_1ha();
     // θ_j = c_j·(1 − s1_j); L = ceil(0.9·δ), U = floor(1.1·δ) para 1 ha (calculados a mano).
-    let theta = [1.469, 1.0738, 4.563, 1.2558, 1.3104, 2.1294, 0.7632, 2.052, 4.7329, 3.0082];
+    let theta = [
+        1.469, 1.0738, 4.563, 1.2558, 1.3104, 2.1294, 0.7632, 2.052, 4.7329, 3.0082,
+    ];
     let l = vec![38, 177, 38, 38, 45, 35, 66, 58, 78, 24];
     let u = vec![46, 215, 46, 46, 53, 41, 80, 70, 94, 28];
     let problema = Problema {
@@ -221,7 +228,10 @@ fn con_gamma_cero_la_banda_lleva_al_optimo_lineal_de_mortalidad() {
         fija: vec![false; n],
         gamma: 0.0,
         theta,
-        restriccion: Restriccion::Banda { l: l.clone(), u: u.clone() },
+        restriccion: Restriccion::Banda {
+            l: l.clone(),
+            u: u.clone(),
+        },
     };
     let params = ParamsTabu {
         candidatos: 50,
@@ -326,9 +336,15 @@ fn aplica_el_mejor_movimiento_aunque_empeore_y_devuelve_el_mejor_visto() {
     };
     let resultado = buscar(&problema, phi_nominal_barajado(2), &params);
     let traza = &resultado.traza;
-    assert!(traza.len() == resultado.iteraciones, "una entrada de la traza por iteración");
+    assert!(
+        traza.len() == resultado.iteraciones,
+        "una entrada de la traza por iteración"
+    );
     let empeoro = traza.windows(2).any(|par| par[1] > par[0] + 1e-12);
-    assert!(empeoro, "la búsqueda tabú debe aceptar movimientos que empeoran (traza nunca sube)");
+    assert!(
+        empeoro,
+        "la búsqueda tabú debe aceptar movimientos que empeoran (traza nunca sube)"
+    );
     let minimo = traza.iter().copied().fold(f64::INFINITY, f64::min);
     assert!(
         (resultado.objetivo - minimo).abs() < 1e-6,
@@ -454,9 +470,15 @@ fn reporta_tiempo_y_curva_del_mejor_por_iteracion() {
         semilla: 4,
     };
     let resultado = buscar(&problema, phi_nominal_barajado(2), &params);
-    assert!(resultado.tiempo_s > 0.0, "debe medir el tiempo de ejecución");
+    assert!(
+        resultado.tiempo_s > 0.0,
+        "debe medir el tiempo de ejecución"
+    );
     let curva = &resultado.curva;
-    assert!(curva.len() == resultado.iteraciones, "una entrada de la curva por iteración");
+    assert!(
+        curva.len() == resultado.iteraciones,
+        "una entrada de la curva por iteración"
+    );
     assert!(
         curva.windows(2).all(|par| par[1] <= par[0]),
         "la curva del mejor objetivo nunca sube"
@@ -468,7 +490,9 @@ fn reporta_tiempo_y_curva_del_mejor_por_iteracion() {
 fn la_banda_nunca_se_viola_en_una_busqueda_mixta() {
     use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
     let (grafo, tabla, n) = instancia_1ha();
-    let theta = [1.469, 1.0738, 4.563, 1.2558, 1.3104, 2.1294, 0.7632, 2.052, 4.7329, 3.0082];
+    let theta = [
+        1.469, 1.0738, 4.563, 1.2558, 1.3104, 2.1294, 0.7632, 2.052, 4.7329, 3.0082,
+    ];
     let l = vec![38, 177, 38, 38, 45, 35, 66, 58, 78, 24];
     let u = vec![46, 215, 46, 46, 53, 41, 80, 70, 94, 28];
     let problema = Problema {
@@ -477,7 +501,10 @@ fn la_banda_nunca_se_viola_en_una_busqueda_mixta() {
         fija: vec![false; n],
         gamma: 1.0,
         theta,
-        restriccion: Restriccion::Banda { l: l.clone(), u: u.clone() },
+        restriccion: Restriccion::Banda {
+            l: l.clone(),
+            u: u.clone(),
+        },
     };
     for semilla in 1..=5 {
         let params = ParamsTabu {
@@ -523,7 +550,10 @@ fn serpentina_invierte_el_sentido_en_filas_impares_y_deja_vacio_el_excedente() {
     // Filas de 3: fila 0 = posiciones 0, 1, 2 (izquierda → derecha); fila 1 = 3, 4, 5.
     // Recorrido: 0, 1, 2, 5, 4, 3. Secuencia [0, 1] → códigos 1, 2, 1, 2, 1 y la última vacía.
     let malla = Malla::rectangular(3, 2, Disposicion::Completa, 1.0);
-    assert_eq!(patron_serpentina(&malla, &[0, 1], 5), vec![1, 2, 1, 0, 1, 2]);
+    assert_eq!(
+        patron_serpentina(&malla, &[0, 1], 5),
+        vec![1, 2, 1, 0, 1, 2]
+    );
 }
 
 #[test]
@@ -581,13 +611,22 @@ fn resolver_paso1_reoptimiza_z_con_la_composicion_fija() {
         fila.z_paso1
     );
     let d = conteos(&phi);
-    assert!(d[1..] == fila.d, "el patrón devuelto tiene la composición D*");
-    assert!(phi.len() == 658, "φ* debe cubrir las 658 posiciones de 1 ha");
+    assert!(
+        d[1..] == fila.d,
+        "el patrón devuelto tiene la composición D*"
+    );
+    assert!(
+        phi.len() == 658,
+        "φ* debe cubrir las 658 posiciones de 1 ha"
+    );
     assert!(
         fila.d.iter().sum::<usize>() == 658,
         "Σ D* debe ser D_tot = 658 (φ* debe plantar todas las posiciones de 1 ha)"
     );
-    let (l, u) = ([38, 177, 38, 38, 45, 35, 66, 58, 78, 24], [46, 215, 46, 46, 53, 41, 80, 70, 94, 28]);
+    let (l, u) = (
+        [38, 177, 38, 38, 45, 35, 66, 58, 78, 24],
+        [46, 215, 46, 46, 53, 41, 80, 70, 94, 28],
+    );
     assert!(
         (0..10).all(|j| l[j] <= fila.d[j] && fila.d[j] <= u[j]),
         "D* (los conteos de φ*) debe quedar en la banda [L, U] de 1 ha y quedó {:?}: φ* es la \
@@ -629,10 +668,17 @@ fn barrido_con_2_gammas_y_2_semillas_produce_4_filas_con_d_en_banda() {
     let instancia = Instancia::nueva("1ha", 1.0, &Datos::base(), &Config::default(), 1.0, false);
     let filas = barrido_gamma(&instancia, &[0.0, 1.0], &[1, 2], &params_cortos(0));
     // 2 γ × 2 semillas = 4 filas; la regla de extensión puede agregar hasta 3 γ más (2 filas c/u).
-    assert!(filas.len() >= 4 && filas.len() <= 10 && filas.len().is_multiple_of(2), "{}", filas.len());
+    assert!(
+        filas.len() >= 4 && filas.len() <= 10 && filas.len().is_multiple_of(2),
+        "{}",
+        filas.len()
+    );
     let gammas: Vec<f64> = filas.iter().take(4).map(|f| f.gamma).collect();
     assert_eq!(gammas, vec![0.0, 0.0, 1.0, 1.0]);
-    assert_eq!(filas.iter().map(|f| f.semilla).take(4).collect::<Vec<_>>(), vec![1, 2, 1, 2]);
+    assert_eq!(
+        filas.iter().map(|f| f.semilla).take(4).collect::<Vec<_>>(),
+        vec![1, 2, 1, 2]
+    );
     for f in &filas {
         assert_eq!(f.instancia, "1ha");
         assert_eq!(f.map_id, 0);
@@ -664,9 +710,16 @@ fn barrido_agrega_gamma_por_3_mientras_d_cambia_en_el_extremo_hasta_3_veces() {
     let gammas: Vec<f64> = filas.iter().map(|f| f.gamma).collect();
     assert_eq!(gammas, vec![1.0, 10.0, 100.0, 300.0, 900.0, 2700.0]);
     // D estable en los dos γ mayores: no se agrega nada.
-    let filas = barrido_con(&[1.0, 10.0, 100.0], &[7], |g, _| fila(g, if g < 5.0 { 1 } else { 2 }));
+    let filas = barrido_con(&[1.0, 10.0, 100.0], &[7], |g, _| {
+        fila(g, if g < 5.0 { 1 } else { 2 })
+    });
     assert_eq!(filas.len(), 3);
     // Cambia una vez y luego se estabiliza: una extensión.
-    let filas = barrido_con(&[1.0, 100.0], &[7], |g, _| fila(g, if g < 50.0 { 1 } else { 2 }));
-    assert_eq!(filas.iter().map(|f| f.gamma).collect::<Vec<_>>(), vec![1.0, 100.0, 300.0]);
+    let filas = barrido_con(&[1.0, 100.0], &[7], |g, _| {
+        fila(g, if g < 50.0 { 1 } else { 2 })
+    });
+    assert_eq!(
+        filas.iter().map(|f| f.gamma).collect::<Vec<_>>(),
+        vec![1.0, 100.0, 300.0]
+    );
 }

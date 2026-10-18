@@ -4,7 +4,11 @@
 use reforestation::escenarios::{estadisticos, generar, percentil, ParamsMc};
 
 fn params() -> ParamsMc {
-    ParamsMc { mu: 129.0, sigma: 3.3, p_hat: [0.1; 10] }
+    ParamsMc {
+        mu: 129.0,
+        sigma: 3.3,
+        p_hat: [0.1; 10],
+    }
 }
 
 #[test]
@@ -38,7 +42,11 @@ fn suma_x_es_t_y_posiciones_validas() {
 
 #[test]
 fn t_se_acota_por_el_numero_de_posiciones() {
-    let p = ParamsMc { mu: 1000.0, sigma: 1.0, p_hat: [0.1; 10] };
+    let p = ParamsMc {
+        mu: 1000.0,
+        sigma: 1.0,
+        p_hat: [0.1; 10],
+    };
     let e = generar(50, 1.0, 1, 0, 1, &p);
     assert_eq!(e.t, 50);
 }
@@ -47,7 +55,11 @@ fn t_se_acota_por_el_numero_de_posiciones() {
 fn x_respeta_las_proporciones() {
     let mut p_hat = [0.0; 10];
     p_hat[3] = 1.0;
-    let p = ParamsMc { mu: 100.0, sigma: 1.0, p_hat };
+    let p = ParamsMc {
+        mu: 100.0,
+        sigma: 1.0,
+        p_hat,
+    };
     let e = generar(658, 1.0, 0, 0, 1, &p);
     assert_eq!(e.x[3] as usize, e.t);
 }
@@ -96,7 +108,10 @@ fn resumen_de_escenarios_construidos_a_mano() {
     assert!((costo.costo_esperado - 1.0).abs() < 1e-12);
     assert_eq!(costo.p_costo_mayor_b, 0.25);
     assert_eq!(costo.violaciones_x_mayor_l, 2);
-    assert_eq!((costo.escenarios_c_negativo, costo.especies_c_negativo), (2, 1));
+    assert_eq!(
+        (costo.escenarios_c_negativo, costo.especies_c_negativo),
+        (2, 1)
+    );
 }
 
 // ---------- Restriccion::Cuotas ----------
@@ -256,7 +271,11 @@ fn x_regenerado_coincide_con_el_csv_de_escenarios_y_el_paso3_respeta_todo() {
         let fila = &filas[omega];
         assert_eq!(fila[1].parse::<usize>().unwrap(), e.t);
         for j in 0..10 {
-            assert_eq!(fila[2 + j].parse::<u32>().unwrap(), e.x[j], "X_{j} de omega {omega}");
+            assert_eq!(
+                fila[2 + j].parse::<u32>().unwrap(),
+                e.x[j],
+                "X_{j} de omega {omega}"
+            );
         }
     }
     // Paso 3 con q sintético (C+ + 3 de holgura).
@@ -267,7 +286,11 @@ fn x_regenerado_coincide_con_el_csv_de_escenarios_y_el_paso3_respeta_todo() {
     }
     let e = generar(inst.malla.len(), inst.area, 0, 0, config.semilla, &mc);
     let q: [u32; 10] = std::array::from_fn(|j| d[j].saturating_sub(e.x[j]) + 3);
-    let params = ParamsTabu { max_iter: 300, max_sin_mejora: 300, ..config.tabu.params(1) };
+    let params = ParamsTabu {
+        max_iter: 300,
+        max_sin_mejora: 300,
+        ..config.tabu.params(1)
+    };
     let (fila, phi) = resolver_escenario(&inst, &base, &q, &d, &e, &params);
     for &(u, j) in &e.posiciones {
         assert_eq!(phi[u], j + 1, "existente movida");

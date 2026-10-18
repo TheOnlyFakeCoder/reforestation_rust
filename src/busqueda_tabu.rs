@@ -8,11 +8,16 @@ use rand_chacha::ChaCha8Rng;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Restriccion {
-    Banda { l: Vec<usize>, u: Vec<usize> },
+    Banda {
+        l: Vec<usize>,
+        u: Vec<usize>,
+    },
     ComposicionFija,
     /// Paso 3: reasignación a → b (a, b ≠ vacía) con conteo_b + 1 ≤ n_b sobre las posiciones
     /// libres; los intercambios entre libres (también con vacías) dejan el total M fijo.
-    Cuotas { n: Vec<usize> },
+    Cuotas {
+        n: Vec<usize>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -82,8 +87,7 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
     let mut mejor_phi = phi.clone();
     // tabu_hasta[u][s]: iteración hasta la que u no puede volver a tener la especie s.
     let mut tabu_hasta = vec![[0usize; N_ESPECIES + 1]; phi.len()];
-    while iteraciones < params.max_iter && sin_mejora < params.max_sin_mejora && libres.len() > 1
-    {
+    while iteraciones < params.max_iter && sin_mejora < params.max_sin_mejora && libres.len() > 1 {
         iteraciones += 1;
         // Mejor de `candidatos` movimientos al azar; se aplica aunque empeore.
         let mut elegido: Option<(f64, Movimiento)> = None;
@@ -113,7 +117,9 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
                     (delta, Movimiento::Reasignar { u, b })
                 }
                 // Reasignación a → b con tope n_b; el total de plantas no cambia de especie-vacía.
-                Restriccion::Cuotas { n: cuotas } if rng.gen::<f64>() >= params.prob_intercambio => {
+                Restriccion::Cuotas { n: cuotas }
+                    if rng.gen::<f64>() >= params.prob_intercambio =>
+                {
                     let (a, b) = (phi[u], rng.gen_range(1..=N_ESPECIES as u8));
                     if a == 0 || a == b || conteos[b as usize] + 1 > cuotas[b as usize - 1] {
                         continue;

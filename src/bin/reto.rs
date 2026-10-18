@@ -14,20 +14,18 @@ use std::process::ExitCode;
 use reforestation::competencia::matriz_w;
 use reforestation::config::Config;
 use reforestation::datos::{Datos, N_ESPECIES};
-use reforestation::escenarios::{
-    estadisticos, generar, percentil, resumir, Escenario, ParamsMc,
-};
-use reforestation::paso1::{patron_serpentina, reparar_a_banda};
-use reforestation::practica::{desglose, serpentina_con_existentes};
-use reforestation::tabu::DEFAULT_ROW_SEQUENCE;
-use reforestation::paso3::{correr_instancia, leer_compra, leer_patron, EntradaPaso3};
+use reforestation::escenarios::{estadisticos, generar, percentil, resumir, Escenario, ParamsMc};
 use reforestation::malla::Malla;
 use reforestation::paso1::{barrido_gamma, mejor_fila, FilaPaso1, Instancia};
+use reforestation::paso1::{patron_serpentina, reparar_a_banda};
+use reforestation::paso3::{correr_instancia, leer_compra, leer_patron, EntradaPaso3};
+use reforestation::practica::{desglose, serpentina_con_existentes};
 use reforestation::reportes::{
     escribir_alcance, escribir_anillos, escribir_barrido_gamma, escribir_composicion_paso1,
     escribir_convergencia, escribir_patron, escribir_resumen_gamma, escribir_resumen_malla,
     escribir_w, resumen_malla,
 };
+use reforestation::tabu::DEFAULT_ROW_SEQUENCE;
 
 /// Configuración compartida con Python; si no existe se usan los valores por defecto.
 const CONFIG_POR_DEFECTO: &str = "config/default.json";
@@ -55,8 +53,14 @@ fn opcion(args: &[String], nombre: &str, por_defecto: &str) -> Result<String, St
     }
 }
 
-const OPCIONES: [&str; 6] =
-    ["--datos", "--resultados", "--config", "--set", "--instancias", "--compra"];
+const OPCIONES: [&str; 6] = [
+    "--datos",
+    "--resultados",
+    "--config",
+    "--set",
+    "--instancias",
+    "--compra",
+];
 /// Opciones sin valor.
 const BANDERAS: [&str; 1] = ["--solo-gamma-star"];
 
@@ -125,12 +129,21 @@ fn ejecutar(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         Some("montecarlo") => {
             let config = cargar_config(args)?;
             let instancias = opcion(args, "--instancias", "1ha,map_27")?;
-            montecarlo(Path::new(&datos_dir), Path::new(&resultados_dir), &config, &instancias)
+            montecarlo(
+                Path::new(&datos_dir),
+                Path::new(&resultados_dir),
+                &config,
+                &instancias,
+            )
         }
         Some("paso3") => {
             let config = cargar_config(args)?;
             let instancias = opcion(args, "--instancias", "1ha,map_27")?;
-            let compra = opcion(args, "--compra", &format!("{resultados_dir}/paso2_compra.csv"))?;
+            let compra = opcion(
+                args,
+                "--compra",
+                &format!("{resultados_dir}/paso2_compra.csv"),
+            )?;
             paso3(
                 Path::new(&datos_dir),
                 Path::new(&resultados_dir),
@@ -142,7 +155,12 @@ fn ejecutar(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         Some("practica") => {
             let config = cargar_config(args)?;
             let instancias = opcion(args, "--instancias", "1ha,map_27")?;
-            practica(Path::new(&datos_dir), Path::new(&resultados_dir), &config, &instancias)
+            practica(
+                Path::new(&datos_dir),
+                Path::new(&resultados_dir),
+                &config,
+                &instancias,
+            )
         }
         otro => Err(format!("subcomando desconocido: {}", otro.unwrap_or("")).into()),
     }
@@ -203,10 +221,19 @@ fn resolver_instancias(
     instancias: &str,
 ) -> Result<Vec<(String, f64)>, Box<dyn std::error::Error>> {
     let mut pedidas: Vec<(String, f64)> = Vec::new();
-    for nombre in instancias.split(',').map(str::trim).filter(|n| !n.is_empty()) {
+    for nombre in instancias
+        .split(',')
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+    {
         if nombre == "todas" {
             pedidas.push(("1ha".to_string(), 1.0));
-            pedidas.extend(datos.poligonos.iter().map(|p| (format!("map_{}", p.map_id), p.area)));
+            pedidas.extend(
+                datos
+                    .poligonos
+                    .iter()
+                    .map(|p| (format!("map_{}", p.map_id), p.area)),
+            );
         } else if nombre == "1ha" {
             pedidas.push((nombre.to_string(), 1.0));
         } else {
@@ -228,7 +255,8 @@ fn resolver_instancias(
 type Composicion = ([u32; N_ESPECIES], [u32; N_ESPECIES], [u32; N_ESPECIES]);
 
 fn leer_composicion(path: &Path, nombre: &str) -> Result<Composicion, Box<dyn std::error::Error>> {
-    let mut lector = csv::Reader::from_path(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut lector =
+        csv::Reader::from_path(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let encabezado = lector.headers()?.clone();
     for registro in lector.records() {
         let registro = registro?;
@@ -284,23 +312,47 @@ fn montecarlo(
 
     let mut esp = csv::Writer::from_path(resultados_dir.join("mc_resumen_especies.csv"))?;
     esp.write_record([
-        "instancia", "map_id", "composicion", "especie", "D", "E_C", "sd_C", "ic95_inf",
-        "ic95_sup", "P90", "P95", "N_necesario",
+        "instancia",
+        "map_id",
+        "composicion",
+        "especie",
+        "D",
+        "E_C",
+        "sd_C",
+        "ic95_inf",
+        "ic95_sup",
+        "P90",
+        "P95",
+        "N_necesario",
     ])?;
     let mut cos = csv::Writer::from_path(resultados_dir.join("mc_resumen_costo.csv"))?;
     cos.write_record([
-        "instancia", "map_id", "composicion", "costo_esperado", "costo_sd", "presupuesto",
-        "P_costo_mayor_B", "violaciones_X_mayor_L", "escenarios_C_negativo", "especies_C_negativo",
+        "instancia",
+        "map_id",
+        "composicion",
+        "costo_esperado",
+        "costo_sd",
+        "presupuesto",
+        "P_costo_mayor_B",
+        "violaciones_X_mayor_L",
+        "escenarios_C_negativo",
+        "especies_C_negativo",
     ])?;
     for (nombre, area) in &pedidas {
-        let map_id = nombre.strip_prefix("map_").and_then(|m| m.parse().ok()).unwrap_or(0u32);
+        let map_id = nombre
+            .strip_prefix("map_")
+            .and_then(|m| m.parse().ok())
+            .unwrap_or(0u32);
         let (d_star, d_nom, l) = leer_composicion(&composicion, nombre)?;
         let d_tot = (datos.densidad_total() as f64 * area).round() as usize;
         let n_pos = Malla::para_objetivo(d_tot, config.d).len();
         let escenarios: Vec<_> = (0..config.n_escenarios)
             .map(|omega| generar(n_pos, *area, map_id, omega, config.semilla, &params))
             .collect();
-        escribir_escenarios(&resultados_dir.join(format!("escenarios_X_{nombre}.csv")), &escenarios)?;
+        escribir_escenarios(
+            &resultados_dir.join(format!("escenarios_X_{nombre}.csv")),
+            &escenarios,
+        )?;
         for (etiqueta, d) in [("nominal", &d_nom), ("gamma_star", &d_star)] {
             let (filas, costo) = resumir(&escenarios, d, &l, &costos, config.presupuesto_ha * area);
             for f in &filas {
@@ -351,26 +403,42 @@ fn paso1(
     std::fs::create_dir_all(resultados_dir)?;
     let pedidas = resolver_instancias(&datos, instancias)?;
 
-    let mut gammas = if solo_star { vec![] } else { config.gammas.clone() };
+    let mut gammas = if solo_star {
+        vec![]
+    } else {
+        config.gammas.clone()
+    };
     if !gammas.contains(&config.gamma_star) {
         gammas.push(config.gamma_star);
     }
-    let semillas: Vec<u64> = (0..config.n_semillas as u64).map(|k| config.semilla + k).collect();
+    let semillas: Vec<u64> = (0..config.n_semillas as u64)
+        .map(|k| config.semilla + k)
+        .collect();
     let params = config.tabu.params(config.semilla);
 
     let inicio = std::time::Instant::now();
     let mut todas: Vec<FilaPaso1> = Vec::new();
     let mut elegidas: Vec<(Instancia, FilaPaso1)> = Vec::new();
     for (nombre, area) in &pedidas {
-        let instancia =
-            Instancia::nueva(nombre, *area, &datos, config, config.m_escala, config.usar_s2);
+        let instancia = Instancia::nueva(
+            nombre,
+            *area,
+            &datos,
+            config,
+            config.m_escala,
+            config.usar_s2,
+        );
         let filas = barrido_gamma(&instancia, &gammas, &semillas, &params);
         let estrella = mejor_fila(filas.iter().filter(|f| f.gamma == config.gamma_star))
             .expect("γ* siempre se corre")
             .clone();
         println!(
             "{nombre}: D_tot = {}, γ* = {}: Z_opt = {:.2} (Z/planta {:.4}), D = {:?}",
-            instancia.d_tot, config.gamma_star, estrella.z_opt, estrella.z_opt_por_planta, estrella.d
+            instancia.d_tot,
+            config.gamma_star,
+            estrella.z_opt,
+            estrella.z_opt_por_planta,
+            estrella.d
         );
         todas.extend(filas);
         elegidas.push((instancia, estrella));
@@ -415,18 +483,42 @@ fn paso3(
 
     let mut esc = csv::Writer::from_path(resultados_dir.join("paso3_escenarios.csv"))?;
     esc.write_record([
-        "instancia", "map_id", "omega", "caso", "T", "V_lib", "M", "Z", "Z_por_planta",
-        "tiempo_s", "iteraciones",
+        "instancia",
+        "map_id",
+        "omega",
+        "caso",
+        "T",
+        "V_lib",
+        "M",
+        "Z",
+        "Z_por_planta",
+        "tiempo_s",
+        "iteraciones",
     ])?;
     let mut res = csv::Writer::from_path(resultados_dir.join("paso3_resumen.csv"))?;
     res.write_record([
-        "instancia", "map_id", "n", "Z_media", "Z_sd", "Z_p5", "Z_p50", "Z_p95", "casos_usual",
-        "casos_presupuesto_corto", "casos_existentes_de_sobra",
+        "instancia",
+        "map_id",
+        "n",
+        "Z_media",
+        "Z_sd",
+        "Z_p5",
+        "Z_p50",
+        "Z_p95",
+        "casos_usual",
+        "casos_presupuesto_corto",
+        "casos_existentes_de_sobra",
     ])?;
     for (nombre, area) in &pedidas {
         let t0 = std::time::Instant::now();
-        let instancia =
-            Instancia::nueva(nombre, *area, &datos, config, config.m_escala, config.usar_s2);
+        let instancia = Instancia::nueva(
+            nombre,
+            *area,
+            &datos,
+            config,
+            config.m_escala,
+            config.usar_s2,
+        );
         let base = leer_patron(&resultados_dir.join(format!("paso1_patron_{nombre}.csv")))?;
         let (d, _, _) = leer_composicion(&resultados_dir.join("paso1_composicion.csv"), nombre)?;
         let q = leer_compra(compra, nombre, config.epsilon, config.pi_factor)?;
@@ -506,9 +598,14 @@ fn paso3(
 
 /// M (plantas nuevas) del escenario ω = 0 de `paso3_escenarios.csv`.
 fn leer_m_omega0(path: &Path, nombre: &str) -> Result<usize, Box<dyn std::error::Error>> {
-    let mut lector = csv::Reader::from_path(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut lector =
+        csv::Reader::from_path(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let enc = lector.headers()?.clone();
-    let col = |n: &str| enc.iter().position(|h| h == n).ok_or_else(|| format!("falta {n}"));
+    let col = |n: &str| {
+        enc.iter()
+            .position(|h| h == n)
+            .ok_or_else(|| format!("falta {n}"))
+    };
     let (ci, co, cm) = (col("instancia")?, col("omega")?, col("M")?);
     for r in lector.records() {
         let r = r?;
@@ -532,13 +629,36 @@ fn practica(
     let inicio = std::time::Instant::now();
     let mut csv = csv::Writer::from_path(resultados_dir.join("practica_distribucion.csv"))?;
     csv.write_record([
-        "instancia", "variante", "plantas", "Z", "Z_por_planta", "pares_inmediatos_misma_especie",
-        "Z_nivel1", "Z_nivel2", "Z_nivel3", "Z_nivel4", "Z_nivel5", "Z_otro",
+        "instancia",
+        "variante",
+        "plantas",
+        "Z",
+        "Z_por_planta",
+        "pares_inmediatos_misma_especie",
+        "Z_nivel1",
+        "Z_nivel2",
+        "Z_nivel3",
+        "Z_nivel4",
+        "Z_nivel5",
+        "Z_otro",
     ])?;
     for (nombre, area) in &pedidas {
-        let inst =
-            Instancia::nueva(nombre, *area, &datos, config, config.m_escala, config.usar_s2);
-        let e0 = generar(inst.malla.len(), inst.area, inst.map_id, 0, config.semilla, &mc);
+        let inst = Instancia::nueva(
+            nombre,
+            *area,
+            &datos,
+            config,
+            config.m_escala,
+            config.usar_s2,
+        );
+        let e0 = generar(
+            inst.malla.len(),
+            inst.area,
+            inst.map_id,
+            0,
+            config.semilla,
+            &mc,
+        );
         let m = leer_m_omega0(&resultados_dir.join("paso3_escenarios.csv"), nombre)?;
         let i = patron_serpentina(&inst.malla, DEFAULT_ROW_SEQUENCE, inst.d_tot);
         let mut ii = i.clone();
@@ -560,7 +680,12 @@ fn practica(
                 variante.to_string(),
                 d.plantas.to_string(),
                 d.z.to_string(),
-                (if d.plantas > 0 { d.z / d.plantas as f64 } else { 0.0 }).to_string(),
+                (if d.plantas > 0 {
+                    d.z / d.plantas as f64
+                } else {
+                    0.0
+                })
+                .to_string(),
                 d.pares_inmediatos.to_string(),
             ];
             fila.extend(d.niveles.iter().map(|x| x.to_string()));

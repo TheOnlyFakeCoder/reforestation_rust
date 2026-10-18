@@ -68,18 +68,72 @@ const ESPECIES: [(&str, u32, f64, f64, f64); N_ESPECIES] = [
 ];
 
 // (familia, género, forma, raíz, CAM, fija N, altura m, R_j/d)
-type Rasgo = (&'static str, &'static str, &'static str, u8, bool, bool, f64, f64);
+type Rasgo = (
+    &'static str,
+    &'static str,
+    &'static str,
+    u8,
+    bool,
+    bool,
+    f64,
+    f64,
+);
 const RASGOS: [Rasgo; N_ESPECIES] = [
     ("Asparagaceae", "Agave", "roseta", 1, true, false, 0.5, 1.0),
     ("Asparagaceae", "Agave", "roseta", 1, true, false, 1.8, 1.0),
     ("Asparagaceae", "Agave", "roseta", 1, true, false, 1.2, 1.0),
     ("Asparagaceae", "Agave", "roseta", 1, true, false, 0.8, 1.0),
-    ("Cactaceae", "Opuntia", "cladodios", 1, true, false, 1.5, 1.0),
-    ("Cactaceae", "Opuntia", "cladodios", 1, true, false, 1.2, 1.0),
-    ("Cactaceae", "Opuntia", "cladodios", 1, true, false, 2.5, 1.0),
-    ("Cactaceae", "Opuntia", "cladodios", 1, true, false, 3.5, 2.0),
+    (
+        "Cactaceae",
+        "Opuntia",
+        "cladodios",
+        1,
+        true,
+        false,
+        1.5,
+        1.0,
+    ),
+    (
+        "Cactaceae",
+        "Opuntia",
+        "cladodios",
+        1,
+        true,
+        false,
+        1.2,
+        1.0,
+    ),
+    (
+        "Cactaceae",
+        "Opuntia",
+        "cladodios",
+        1,
+        true,
+        false,
+        2.5,
+        1.0,
+    ),
+    (
+        "Cactaceae",
+        "Opuntia",
+        "cladodios",
+        1,
+        true,
+        false,
+        3.5,
+        2.0,
+    ),
     ("Fabaceae", "Prosopis", "árbol", 3, false, true, 8.0, 2.5),
-    ("Asparagaceae", "Yucca", "arborescente", 2, true, false, 7.0, 2.0),
+    (
+        "Asparagaceae",
+        "Yucca",
+        "arborescente",
+        2,
+        true,
+        false,
+        7.0,
+        2.0,
+    ),
 ];
 
 // 6.28 ha es el área de un polígono, no una aproximación de τ.
@@ -239,7 +293,11 @@ impl Datos {
         w.flush()?;
 
         let mut w = csv::Writer::from_path(dir.join("poligonos.csv"))?;
-        let mut encabezado = vec!["id".to_string(), "map_id".to_string(), "area_ha".to_string()];
+        let mut encabezado = vec![
+            "id".to_string(),
+            "map_id".to_string(),
+            "area_ha".to_string(),
+        ];
         encabezado.extend((0..N_ESPECIES).map(|j| format!("X_{j}")));
         w.write_record(&encabezado)?;
         for p in &self.poligonos {
@@ -262,7 +320,9 @@ impl Datos {
             for tabla in [&especies_csv, &supervivencia, &rasgos] {
                 let idx: usize = tabla.valor(j, "idx")?;
                 if idx != j {
-                    return Err(format!("{}: la fila {} tiene idx {idx}", tabla.nombre, j + 1).into());
+                    return Err(
+                        format!("{}: la fila {} tiene idx {idx}", tabla.nombre, j + 1).into(),
+                    );
                 }
             }
             especies.push(Especie {
@@ -390,9 +450,15 @@ mod tests {
     #[test]
     fn existentes_de_p1_y_p30_coinciden_con_writer() {
         let datos = Datos::base();
-        assert_eq!(datos.poligonos[0].existentes, [8, 46, 16, 16, 11, 14, 18, 12, 15, 9]);
+        assert_eq!(
+            datos.poligonos[0].existentes,
+            [8, 46, 16, 16, 11, 14, 18, 12, 15, 9]
+        );
         assert_eq!(datos.poligonos[0].total_existentes(), 165);
-        assert_eq!(datos.poligonos[29].existentes, [34, 195, 56, 58, 55, 46, 91, 63, 86, 23]);
+        assert_eq!(
+            datos.poligonos[29].existentes,
+            [34, 195, 56, 58, 55, 46, 91, 63, 86, 23]
+        );
     }
 
     #[test]

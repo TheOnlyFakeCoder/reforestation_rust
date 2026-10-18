@@ -107,7 +107,6 @@ pub fn serpentina_con_existentes(
     phi
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,7 +127,10 @@ mod tests {
         }
         for j in 0..N_ESPECIES {
             for k in 0..N_ESPECIES {
-                assert_eq!(nivel(j, k, &datos.especies, &w), nivel(k, j, &datos.especies, &w));
+                assert_eq!(
+                    nivel(j, k, &datos.especies, &w),
+                    nivel(k, j, &datos.especies, &w)
+                );
             }
         }
     }
@@ -157,8 +159,15 @@ mod tests {
         let (datos, w, inst) = montaje();
         let phi = vec![1u8; inst.malla.len()];
         let d = desglose(&phi, &inst.grafo, &inst.tabla, &datos.especies, &w);
-        let esperado: usize =
-            (0..phi.len()).map(|u| inst.grafo.vecinos(u).iter().filter(|v| v.anillo == 0 && v.pos as usize > u).count()).sum();
+        let esperado: usize = (0..phi.len())
+            .map(|u| {
+                inst.grafo
+                    .vecinos(u)
+                    .iter()
+                    .filter(|v| v.anillo == 0 && v.pos as usize > u)
+                    .count()
+            })
+            .sum();
         assert_eq!(d.pares_inmediatos, esperado);
         assert!(esperado > 0);
         assert!((d.niveles[0] - d.z).abs() < 1e-9);
@@ -172,7 +181,10 @@ mod tests {
         for &(u, j) in &existentes {
             assert_eq!(phi[u], j + 1);
         }
-        assert_eq!(phi.iter().filter(|&&c| c > 0).count(), existentes.len() + 50);
+        assert_eq!(
+            phi.iter().filter(|&&c| c > 0).count(),
+            existentes.len() + 50
+        );
         // la secuencia se asigna en orden a las libres, saltando ocupadas: la primera libre del
         // recorrido (posición 2 de la fila 0) recibe el primer elemento
         assert_eq!(phi[2] as usize, DEFAULT_ROW_SEQUENCE[0] + 1);

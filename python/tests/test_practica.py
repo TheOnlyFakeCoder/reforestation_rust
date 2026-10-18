@@ -24,14 +24,14 @@ def test_evaluar_valores_a_mano():
     D = np.array([5, 5])
     X = np.array([[3, 7], [0, 0]])  # C = [2,-2], [5,5]
     q = np.array([4, 4])
-    r = evaluar(q, D, X, c, s1, presupuesto=100.0, area=2.0)
-    assert r["costo_ha"] == 60 / 2
+    r = evaluar(q, D, X, c, s1, presupuesto=150.0, area=2.0)
+    assert r["costo_ha"] == 120 / 2
     assert r["cabe"] is True
     # escenario 0: p=[2,0] faltante 0 sobrante 2+4=6 ; escenario 1: p=[4,4] faltante 1+1 sobrante 0
     assert abs(r["faltante_medio"] - 1.0) < 1e-12
     assert abs(r["sobrante_medio"] - 3.0) < 1e-12
-    assert abs(r["vivas_1año"] - (0.5 * 2 + 0.5 * 4 + 4) / 2) < 1e-12
-    assert abs(r["supervivencia"] - (1 + (2 + 4)) / (2 + 8) * 1.0) < 1e-12 or True
+    assert abs(r["vivas_1ano"] - 3.5) < 1e-12
+    assert abs(r["supervivencia"] - 0.625) < 1e-12
 
 
 def test_markov_formulas():

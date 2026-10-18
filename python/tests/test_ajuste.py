@@ -59,7 +59,8 @@ def test_dirichlet_multinomial_mejora_loglik(datos):
     _, X = datos
     p = ajuste.p_hat(X)
     a0 = ajuste.precision_dm(X)
-    assert a0 > 0
+    assert 14000 < a0 < 16500
+    assert round(a0) == 15277
     ll = lambda a: ajuste.loglik_dm(X, a * p)
     assert ll(a0) >= ll(a0 * 0.5) and ll(a0) >= ll(a0 * 2)
 
@@ -69,7 +70,8 @@ def test_por_especie(datos):
     t = ajuste.por_especie(area, X)
     assert len(t) == 10
     assert {"especie", "mu_ha", "dispersion_poisson", "AIC_poisson", "k_bn", "AIC_bn"} <= set(t.columns)
-    assert (t["dispersion_poisson"] > 0).all()
+    d = t["dispersion_poisson"]
+    assert round(d.min(), 2) == 0.58 and round(d.max(), 2) == 1.45
 
 
 def test_main_escribe_salidas(tmp_path):

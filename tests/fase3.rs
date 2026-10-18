@@ -97,3 +97,88 @@ fn resumen_de_escenarios_construidos_a_mano() {
     assert_eq!(costo.violaciones_x_mayor_l, 2);
     assert_eq!((costo.escenarios_c_negativo, costo.especies_c_negativo), (2, 1));
 }
+
+// ---------- Restriccion::Cuotas ----------
+
+use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+use reforestation::competencia::{matriz_w, radio_max, radios, TablaCompetencia};
+use reforestation::config::Config;
+use reforestation::datos::Datos;
+use reforestation::malla::Malla;
+use reforestation::objetivo::{z_total, Grafo};
+
+fn instancia_1ha() -> (Grafo, TablaCompetencia, usize) {
+    let config = Config::default();
+    let especies = Datos::base().especies;
+    let r = radios(&especies, config.d, config.factor_radios);
+    let malla = Malla::para_objetivo(658, config.d);
+    let vecindad = malla.vecindad(radio_max(&r, config.d), config.tolerancia);
+    let w = matriz_w(&especies, config.kappa);
+    let tabla = TablaCompetencia::nueva(&w, &r, &vecindad.anillos, config.d, config.tolerancia);
+    (Grafo::desde(&vecindad), tabla, malla.len())
+}
+
+#[test]
+fn cuotas_respeta_fijas_cuotas_y_total_y_el_delta_es_coherente() {
+    let (grafo, tabla, n) = instancia_1ha();
+    // Primeras 100 posiciones fijas (existentes), el resto libre.
+    let mut fija = vec![false; n];
+    let mut phi = vec![0u8; n];
+    for u in 0..100 {
+        fija[u] = true;
+        phi[u] = (u % 10) as u8 + 1;
+    }
+    // 300 libres plantadas con la especie (u % 10) + 1 a partir de la posición 100.
+    let cuotas = vec![40usize, 30, 30, 30, 30, 30, 30, 30, 30, 20];
+    let mut restantes = cuotas.clone();
+    let mut u = 100;
+    'fuera: loop {
+        for j in 0..10 {
+            if restantes[j] > 0 {
+                phi[u] = j as u8 + 1;
+                restantes[j] -= 1;
+                u += 1;
+                if u >= n {
+                    break 'fuera;
+                }
+            }
+        }
+        if restantes.iter().all(|&r| r == 0) {
+            break;
+        }
+    }
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: fija.clone(),
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::Cuotas { n: cuotas.clone() },
+    };
+    let params = ParamsTabu {
+        candidatos: 50,
+        tenure: 10,
+        max_iter: 1_500,
+        max_sin_mejora: 1_500,
+        prob_intercambio: 0.8,
+        semilla: 3,
+    };
+    let libres_antes = (0..n).filter(|&u| !fija[u] && phi[u] > 0).count();
+    let r = buscar(&problema, phi.clone(), &params);
+    for u in 0..100 {
+        assert_eq!(r.phi[u], phi[u], "existente movida");
+    }
+    let mut cuenta = [0usize; 11];
+    for u in 0..n {
+        if !fija[u] {
+            cuenta[r.phi[u] as usize] += 1;
+        }
+    }
+    for j in 0..10 {
+        assert!(cuenta[j + 1] <= cuotas[j], "cuota {j} excedida");
+    }
+    assert_eq!(cuenta[1..].iter().sum::<usize>(), libres_antes);
+    assert!((r.z - z_total(&r.phi, &grafo, &tabla)).abs() < 1e-9);
+    assert!((r.objetivo - problema.objetivo(&r.phi)).abs() < 1e-9);
+    assert!(r.objetivo < problema.objetivo(&phi) - 1.0, "no mejora");
+}

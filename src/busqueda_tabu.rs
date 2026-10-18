@@ -10,6 +10,9 @@ use rand_chacha::ChaCha8Rng;
 pub enum Restriccion {
     Banda { l: Vec<usize>, u: Vec<usize> },
     ComposicionFija,
+    /// Paso 3: reasignación a → b (a, b ≠ vacía) con conteo_b + 1 ≤ n_b sobre las posiciones
+    /// libres; los intercambios entre libres (también con vacías) dejan el total M fijo.
+    Cuotas { n: Vec<usize> },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -68,8 +71,12 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
     let mut traza = Vec::new();
     let mut curva = Vec::new();
     let mut conteos = [0usize; N_ESPECIES + 1];
-    for &c in &phi {
-        conteos[c as usize] += 1;
+    // Con cuotas sólo cuentan las posiciones libres (las existentes no consumen cuota).
+    let solo_libres = matches!(problema.restriccion, Restriccion::Cuotas { .. });
+    for (u, &c) in phi.iter().enumerate() {
+        if !(solo_libres && problema.fija[u]) {
+            conteos[c as usize] += 1;
+        }
     }
     let mut mejor_objetivo = actual;
     let mut mejor_phi = phi.clone();
@@ -93,6 +100,22 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
                         || conteos[a as usize] - 1 < l[a as usize - 1]
                         || conteos[b as usize] + 1 > tope[b as usize - 1]
                     {
+                        continue;
+                    }
+                    let delta = problema.gamma
+                        * delta_reasignacion(&phi, u, b, problema.grafo, problema.tabla)
+                        + problema.theta[b as usize - 1]
+                        - problema.theta[a as usize - 1];
+                    let es_tabu = tabu_hasta[u][b as usize] > iteraciones;
+                    if !admisible(es_tabu, actual, delta, mejor_objetivo) {
+                        continue;
+                    }
+                    (delta, Movimiento::Reasignar { u, b })
+                }
+                // Reasignación a → b con tope n_b; el total de plantas no cambia de especie-vacía.
+                Restriccion::Cuotas { n: cuotas } if rng.gen::<f64>() >= params.prob_intercambio => {
+                    let (a, b) = (phi[u], rng.gen_range(1..=N_ESPECIES as u8));
+                    if a == 0 || a == b || conteos[b as usize] + 1 > cuotas[b as usize - 1] {
                         continue;
                     }
                     let delta = problema.gamma

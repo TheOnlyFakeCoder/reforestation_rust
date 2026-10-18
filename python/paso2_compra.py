@@ -46,18 +46,20 @@ def _solver():
 
 
 def resolver_ple(C, c, pi_factor, presupuesto=None, eta=0.0):
+    """PLE exacto; agrupa escenarios con el mismo C_j (equivale a la forma completa)."""
     n = C.shape[0]
     prob = pulp.LpProblem("paso2", pulp.LpMinimize)
     q = [prob.add_variable(f"q{j}", lowBound=0, cat="Integer") for j in range(J)]
-    f = [[prob.add_variable(f"f{j}_{w}", lowBound=0) for w in range(n)] for j in range(J)]
-    e = [[prob.add_variable(f"e{j}_{w}", lowBound=0) for w in range(n)] for j in range(J)]
     pen = []
     for j in range(J):
         pi = pi_factor * c[j]
-        for w in range(n):
-            prob += f[j][w] >= float(C[w, j]) - q[j]
-            prob += e[j][w] >= q[j] - float(C[w, j])
-            pen.append(pi * f[j][w] + eta * e[j][w])
+        valores, cuentas = np.unique(C[:, j], return_counts=True)
+        for k, (v, m) in enumerate(zip(valores, cuentas)):
+            f = prob.add_variable(f"f{j}_{k}", lowBound=0)
+            e = prob.add_variable(f"e{j}_{k}", lowBound=0)
+            prob += f >= float(v) - q[j]
+            prob += e >= q[j] - float(v)
+            pen.append((float(m) * pi) * f + (float(m) * eta) * e)
     prob += pulp.lpSum(float(c[j]) * q[j] for j in range(J)) + pulp.lpSum(pen) * (1.0 / n)
     if presupuesto is not None:
         prob += pulp.lpSum(float(c[j]) * q[j] for j in range(J)) <= presupuesto

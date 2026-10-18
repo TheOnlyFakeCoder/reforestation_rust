@@ -629,7 +629,7 @@ fn barrido_con_2_gammas_y_2_semillas_produce_4_filas_con_d_en_banda() {
     let instancia = Instancia::nueva("1ha", 1.0, &Datos::base(), &Config::default(), 1.0, false);
     let filas = barrido_gamma(&instancia, &[0.0, 1.0], &[1, 2], &params_cortos(0));
     // 2 γ × 2 semillas = 4 filas; la regla de extensión puede agregar hasta 3 γ más (2 filas c/u).
-    assert!(filas.len() >= 4 && filas.len() <= 10 && filas.len() % 2 == 0, "{}", filas.len());
+    assert!(filas.len() >= 4 && filas.len() <= 10 && filas.len().is_multiple_of(2), "{}", filas.len());
     let gammas: Vec<f64> = filas.iter().take(4).map(|f| f.gamma).collect();
     assert_eq!(gammas, vec![0.0, 0.0, 1.0, 1.0]);
     assert_eq!(filas.iter().map(|f| f.semilla).take(4).collect::<Vec<_>>(), vec![1, 2, 1, 2]);

@@ -3,8 +3,9 @@
 use crate::competencia::{alcance, radio_max, radios};
 use crate::composicion::d_tot;
 use crate::config::Config;
-use crate::datos::{Datos, Especie};
+use crate::datos::{Datos, Especie, N_ESPECIES};
 use crate::malla::{Disposicion, Malla};
+use crate::paso1::{mejor_fila, FilaPaso1, Instancia};
 use std::error::Error;
 use std::path::Path;
 
@@ -199,6 +200,172 @@ pub fn resumen_malla(datos: &Datos, config: &Config) -> Vec<FilaMalla> {
             }
         })
         .collect()
+}
+
+// ---------------------------------------------------------------------------------------------
+// Paso 1
+// ---------------------------------------------------------------------------------------------
+
+fn columnas(prefijo: &str) -> Vec<String> {
+    (0..N_ESPECIES).map(|j| format!("{prefijo}_{j}")).collect()
+}
+
+fn media(xs: impl Iterator<Item = f64>) -> f64 {
+    let (suma, n) = xs.fold((0.0, 0usize), |(s, n), x| (s + x, n + 1));
+    suma / n as f64
+}
+
+/// Una fila por instancia × γ × semilla.
+pub fn escribir_barrido_gamma(path: &Path, filas: &[FilaPaso1]) -> Result<(), Box<dyn Error>> {
+    let mut csv = csv::Writer::from_path(path)?;
+    let mut encabezado: Vec<String> =
+        ["instancia", "map_id", "gamma", "semilla"].map(String::from).to_vec();
+    encabezado.extend(columnas("D"));
+    encabezado.extend(
+        [
+            "d_tot",
+            "suma_theta_d",
+            "suma_c_d",
+            "z_paso1",
+            "z_opt",
+            "z_opt_por_planta",
+            "tiempo_paso1_s",
+            "iter_paso1",
+            "tiempo_opt_s",
+            "iter_opt",
+        ]
+        .map(String::from),
+    );
+    csv.write_record(&encabezado)?;
+    for f in filas {
+        let mut r = vec![
+            f.instancia.clone(),
+            f.map_id.to_string(),
+            f.gamma.to_string(),
+            f.semilla.to_string(),
+        ];
+        r.extend(f.d.iter().map(|x| x.to_string()));
+        r.extend([
+            f.d_tot.to_string(),
+            f.suma_theta_d.to_string(),
+            f.suma_c_d.to_string(),
+            f.z_paso1.to_string(),
+            f.z_opt.to_string(),
+            f.z_opt_por_planta.to_string(),
+            f.tiempo_paso1_s.to_string(),
+            f.iter_paso1.to_string(),
+            f.tiempo_opt_s.to_string(),
+            f.iter_opt.to_string(),
+        ]);
+        csv.write_record(&r)?;
+    }
+    csv.flush()?;
+    Ok(())
+}
+
+/// Una fila por instancia × γ: D de la semilla con menor objetivo del paso 1 y estadísticos de
+/// Z_opt, tiempo e iteraciones sobre las semillas.
+pub fn escribir_resumen_gamma(path: &Path, filas: &[FilaPaso1]) -> Result<(), Box<dyn Error>> {
+    let mut csv = csv::Writer::from_path(path)?;
+    let mut encabezado: Vec<String> = ["instancia", "map_id", "gamma"].map(String::from).to_vec();
+    encabezado.extend(columnas("D"));
+    encabezado.extend(
+        [
+            "suma_theta_d",
+            "suma_c_d",
+            "z_opt_media",
+            "z_opt_min",
+            "z_opt_max",
+            "z_opt_por_planta_media",
+            "tiempo_medio_s",
+            "iter_media",
+        ]
+        .map(String::from),
+    );
+    csv.write_record(&encabezado)?;
+    let mut grupos: Vec<(&str, f64)> = Vec::new();
+    for f in filas {
+        if !grupos.iter().any(|&(i, g)| i == f.instancia && g == f.gamma) {
+            grupos.push((&f.instancia, f.gamma));
+        }
+    }
+    for (instancia, gamma) in grupos {
+        let grupo = || filas.iter().filter(move |f| f.instancia == instancia && f.gamma == gamma);
+        let mejor = mejor_fila(grupo()).expect("grupo no vacío");
+        let mut r = vec![instancia.to_string(), mejor.map_id.to_string(), gamma.to_string()];
+        r.extend(mejor.d.iter().map(|x| x.to_string()));
+        r.extend([
+            mejor.suma_theta_d.to_string(),
+            mejor.suma_c_d.to_string(),
+            media(grupo().map(|f| f.z_opt)).to_string(),
+            grupo().map(|f| f.z_opt).fold(f64::INFINITY, f64::min).to_string(),
+            grupo().map(|f| f.z_opt).fold(f64::NEG_INFINITY, f64::max).to_string(),
+            media(grupo().map(|f| f.z_opt_por_planta)).to_string(),
+            media(grupo().map(|f| f.tiempo_paso1_s + f.tiempo_opt_s)).to_string(),
+            media(grupo().map(|f| (f.iter_paso1 + f.iter_opt) as f64)).to_string(),
+        ]);
+        csv.write_record(&r)?;
+    }
+    csv.flush()?;
+    Ok(())
+}
+
+/// Composición D* de γ* de cada instancia con D̄, L y U.
+pub fn escribir_composicion_paso1(
+    path: &Path,
+    elegidas: &[(&Instancia, &FilaPaso1)],
+) -> Result<(), Box<dyn Error>> {
+    let mut csv = csv::Writer::from_path(path)?;
+    let mut encabezado: Vec<String> =
+        ["instancia", "map_id", "area_ha", "d_tot"].map(String::from).to_vec();
+    for prefijo in ["D", "Dnom", "L", "U"] {
+        encabezado.extend(columnas(prefijo));
+    }
+    csv.write_record(&encabezado)?;
+    for (instancia, fila) in elegidas {
+        let mut r = vec![
+            instancia.nombre.clone(),
+            instancia.map_id.to_string(),
+            instancia.area.to_string(),
+            instancia.d_tot.to_string(),
+        ];
+        r.extend(fila.d.iter().map(|x| x.to_string()));
+        r.extend(instancia.nominal.iter().map(|x| x.to_string()));
+        r.extend(instancia.banda.l.iter().map(|x| x.to_string()));
+        r.extend(instancia.banda.u.iter().map(|x| x.to_string()));
+        csv.write_record(&r)?;
+    }
+    csv.flush()?;
+    Ok(())
+}
+
+/// Patrón φ*: una fila por posición; especie −1 si está vacía.
+pub fn escribir_patron(path: &Path, malla: &Malla, phi: &[u8]) -> Result<(), Box<dyn Error>> {
+    let mut csv = csv::Writer::from_path(path)?;
+    csv.write_record(["pos", "fila", "col", "x", "y", "especie"])?;
+    for (u, p) in malla.posiciones.iter().enumerate() {
+        csv.write_record([
+            u.to_string(),
+            p.fila.to_string(),
+            p.col.to_string(),
+            p.x.to_string(),
+            p.y.to_string(),
+            (phi[u] as i32 - 1).to_string(),
+        ])?;
+    }
+    csv.flush()?;
+    Ok(())
+}
+
+/// Convergencia del paso 1: objetivo actual y mejor por iteración.
+pub fn escribir_convergencia(path: &Path, fila: &FilaPaso1) -> Result<(), Box<dyn Error>> {
+    let mut csv = csv::Writer::from_path(path)?;
+    csv.write_record(["iteracion", "actual", "mejor"])?;
+    for (k, (actual, mejor)) in fila.traza.iter().zip(&fila.curva).enumerate() {
+        csv.write_record([(k + 1).to_string(), actual.to_string(), mejor.to_string()])?;
+    }
+    csv.flush()?;
+    Ok(())
 }
 
 #[cfg(test)]

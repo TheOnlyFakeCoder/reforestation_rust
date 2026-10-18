@@ -308,8 +308,7 @@ mod tests {
 
     #[test]
     fn validar_rechaza_gamma_negativa_semillas_cero_y_tabu_invalido() {
-        let mut c = Config::default();
-        c.gammas = vec![0.0, -1.0];
+        let c = Config { gammas: vec![0.0, -1.0], ..Config::default() };
         assert!(c.validar().unwrap_err().contains("gammas"));
         let c = Config { n_semillas: 0, ..Config::default() };
         assert!(c.validar().unwrap_err().contains("n_semillas"));

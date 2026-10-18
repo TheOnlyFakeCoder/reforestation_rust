@@ -207,3 +207,112 @@ fn la_validacion_corre_despues_de_todos_los_set() {
         String::from_utf8_lossy(&salida.stderr)
     );
 }
+
+const TABU_CORTO: &str =
+    r#"tabu={"candidatos":20,"tenure":5,"max_iter":200,"max_sin_mejora":200,"prob_intercambio":0.5}"#;
+
+fn encabezado_de(dir: &std::path::Path, archivo: &str) -> String {
+    let texto = std::fs::read_to_string(dir.join(archivo))
+        .unwrap_or_else(|e| panic!("`reto paso1` no escribió {archivo}: {e}"));
+    texto.lines().next().unwrap().to_string()
+}
+
+#[test]
+fn paso1_escribe_los_csv_con_los_encabezados_exactos() {
+    let datos = dir_temporal("paso1_datos");
+    let resultados = dir_temporal("paso1_resultados");
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    let salida = reto(&[
+        "paso1",
+        "--datos",
+        datos.to_str().unwrap(),
+        "--resultados",
+        resultados.to_str().unwrap(),
+        "--instancias",
+        "1ha",
+        "--set",
+        TABU_CORTO,
+        "--set",
+        "gammas=[0.0,1.0]",
+        "--set",
+        "n_semillas=2",
+    ]);
+    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    let d: String = (0..10).map(|j| format!("D_{j},")).collect();
+    assert_eq!(
+        encabezado_de(&resultados, "paso1_barrido_gamma.csv"),
+        format!(
+            "instancia,map_id,gamma,semilla,{d}d_tot,suma_theta_d,suma_c_d,z_paso1,z_opt,\
+             z_opt_por_planta,tiempo_paso1_s,iter_paso1,tiempo_opt_s,iter_opt"
+        )
+    );
+    assert_eq!(
+        encabezado_de(&resultados, "paso1_resumen_gamma.csv"),
+        format!(
+            "instancia,map_id,gamma,{d}suma_theta_d,suma_c_d,z_opt_media,z_opt_min,z_opt_max,\
+             z_opt_por_planta_media,tiempo_medio_s,iter_media"
+        )
+        .replace(",,", ",")
+    );
+    let cols = |p: &str| (0..10).map(|j| format!("{p}_{j}")).collect::<Vec<_>>().join(",");
+    assert_eq!(
+        encabezado_de(&resultados, "paso1_composicion.csv"),
+        format!(
+            "instancia,map_id,area_ha,d_tot,{},{},{},{}",
+            cols("D"),
+            cols("Dnom"),
+            cols("L"),
+            cols("U")
+        )
+    );
+    assert_eq!(
+        encabezado_de(&resultados, "paso1_patron_1ha.csv"),
+        "pos,fila,col,x,y,especie"
+    );
+    assert_eq!(
+        encabezado_de(&resultados, "convergencia_1ha.csv"),
+        "iteracion,actual,mejor"
+    );
+    let barrido = std::fs::read_to_string(resultados.join("paso1_barrido_gamma.csv")).unwrap();
+    assert!(barrido.lines().count() >= 5, "2 γ × 2 semillas + encabezado");
+    let patron = std::fs::read_to_string(resultados.join("paso1_patron_1ha.csv")).unwrap();
+    assert_eq!(patron.lines().count(), 1 + 658);
+    let comp = std::fs::read_to_string(resultados.join("paso1_composicion.csv")).unwrap();
+    assert_eq!(comp.lines().count(), 2);
+    assert!(comp.lines().nth(1).unwrap().starts_with("1ha,0,1,658,"));
+}
+
+#[test]
+fn paso1_solo_gamma_star_corre_un_solo_gamma_y_valida_despues_de_set() {
+    let datos = dir_temporal("paso1s_datos");
+    let resultados = dir_temporal("paso1s_resultados");
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    let base = |extra: &[&'static str]| {
+        let mut args = vec![
+            "paso1",
+            "--datos",
+            datos.to_str().unwrap(),
+            "--resultados",
+            resultados.to_str().unwrap(),
+            "--instancias",
+            "1ha",
+            "--solo-gamma-star",
+            "--set",
+            TABU_CORTO,
+            "--set",
+            "n_semillas=2",
+        ];
+        args.extend_from_slice(extra);
+        reto(&args)
+    };
+    let salida = base(&[]);
+    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    let resumen = std::fs::read_to_string(resultados.join("paso1_resumen_gamma.csv")).unwrap();
+    assert_eq!(resumen.lines().count(), 2, "sólo γ*: una fila por instancia");
+    let barrido = std::fs::read_to_string(resultados.join("paso1_barrido_gamma.csv")).unwrap();
+    assert_eq!(barrido.lines().count(), 3, "γ* × 2 semillas");
+    // Un --set inválido (n_semillas=0) falla aunque venga después de los demás.
+    let salida = base(&["--set", "n_semillas=0"]);
+    assert!(!salida.status.success());
+    assert!(String::from_utf8_lossy(&salida.stderr).contains("n_semillas"));
+}

@@ -1,3 +1,6 @@
+//! LEGACY: genera `bins/*.bin` para la UI y `simulation` (nombres sin corregir). Los datos del
+//! Entregable 2 se exportan con `reto datos` a `data/*.csv`.
+
 #![allow(clippy::approx_constant)]
 
 use reforestation::algorithm::Algorithm;

@@ -1,0 +1,11 @@
+idx,especie,familia,genero,forma,raiz,cam,fija_n,altura_m,radio_d
+0,Agave lechuguilla,Asparagaceae,Agave,roseta,1,1,0,0.5,1
+1,Agave salmiana,Asparagaceae,Agave,roseta,1,1,0,1.8,1
+2,Agave scabra,Asparagaceae,Agave,roseta,1,1,0,1.2,1
+3,Agave striata,Asparagaceae,Agave,roseta,1,1,0,0.8,1
+4,Opuntia cantabrigiensis,Cactaceae,Opuntia,cladodios,1,1,0,1.5,1
+5,Opuntia engelmannii,Cactaceae,Opuntia,cladodios,1,1,0,1.2,1
+6,Opuntia robusta,Cactaceae,Opuntia,cladodios,1,1,0,2.5,1
+7,Opuntia streptacantha,Cactaceae,Opuntia,cladodios,1,1,0,3.5,2
+8,Prosopis laevigata,Fabaceae,Prosopis,árbol,3,0,1,8,2.5
+9,Yucca filifera,Asparagaceae,Yucca,arborescente,2,1,0,7,2

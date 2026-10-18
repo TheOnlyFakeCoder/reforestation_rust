@@ -1,0 +1,24 @@
+{
+  "d": 4.189171180993856,
+  "epsilon": 0.10,
+  "kappa": 0.6,
+  "factor_radios": 1.0,
+  "tolerancia": 1e-6,
+  "gammas": [0.0, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0],
+  "gamma_star": 3.0,
+  "n_semillas": 3,
+  "semilla": 20261017,
+  "m_escala": 1.0,
+  "usar_s2": false,
+  "presupuesto_ha": 12500.0,
+  "n_escenarios": 1000,
+  "n_escenarios_paso3": 100,
+  "pi_factor": 2.0,
+  "tabu": {
+    "candidatos": 64,
+    "tenure": 15,
+    "max_iter": 20000,
+    "max_sin_mejora": 3000,
+    "prob_intercambio": 0.5
+  }
+}

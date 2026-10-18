@@ -5,6 +5,7 @@
 //!   malla   |V|, D_tot y pares por anillo de 1 ha y de cada polígono; exporta W
 //!   montecarlo  escenarios de existentes y resúmenes de C y costo [--instancias …|todas]
 //!   paso3  ajuste al polígono real por escenario [--instancias …|todas] [--compra CSV]
+//!   practica  práctica actual (serpentina) contra el tabú [--instancias …|todas]
 //!   paso1  barrido de γ y patrón base [--instancias 1ha,map_27|todas] [--solo-gamma-star]
 
 use std::path::Path;
@@ -16,6 +17,9 @@ use reforestation::datos::{Datos, N_ESPECIES};
 use reforestation::escenarios::{
     estadisticos, generar, percentil, resumir, Escenario, ParamsMc,
 };
+use reforestation::paso1::{patron_serpentina, reparar_a_banda};
+use reforestation::practica::{desglose, serpentina_con_existentes};
+use reforestation::tabu::DEFAULT_ROW_SEQUENCE;
 use reforestation::paso3::{correr_instancia, leer_compra, leer_patron, EntradaPaso3};
 use reforestation::malla::Malla;
 use reforestation::paso1::{barrido_gamma, mejor_fila, FilaPaso1, Instancia};
@@ -134,6 +138,11 @@ fn ejecutar(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
                 &instancias,
                 Path::new(&compra),
             )
+        }
+        Some("practica") => {
+            let config = cargar_config(args)?;
+            let instancias = opcion(args, "--instancias", "1ha,map_27")?;
+            practica(Path::new(&datos_dir), Path::new(&resultados_dir), &config, &instancias)
         }
         otro => Err(format!("subcomando desconocido: {}", otro.unwrap_or("")).into()),
     }
@@ -492,5 +501,93 @@ fn paso3(
     esc.flush()?;
     res.flush()?;
     println!("paso 3: {:.1} s", inicio.elapsed().as_secs_f64());
+    Ok(())
+}
+
+/// M (plantas nuevas) del escenario ω = 0 de `paso3_escenarios.csv`.
+fn leer_m_omega0(path: &Path, nombre: &str) -> Result<usize, Box<dyn std::error::Error>> {
+    let mut lector = csv::Reader::from_path(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let enc = lector.headers()?.clone();
+    let col = |n: &str| enc.iter().position(|h| h == n).ok_or_else(|| format!("falta {n}"));
+    let (ci, co, cm) = (col("instancia")?, col("omega")?, col("M")?);
+    for r in lector.records() {
+        let r = r?;
+        if &r[ci] == nombre && &r[co] == "0" {
+            return Ok(r[cm].parse()?);
+        }
+    }
+    Err(format!("{}: sin ω = 0 para {nombre}", path.display()).into())
+}
+
+fn practica(
+    datos_dir: &Path,
+    resultados_dir: &Path,
+    config: &Config,
+    instancias: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let datos = Datos::cargar(datos_dir)?;
+    let pedidas = resolver_instancias(&datos, instancias)?;
+    let mc = ParamsMc::leer(&resultados_dir.join("mc_params.json"))?;
+    let w = matriz_w(&datos.especies, config.kappa);
+    let inicio = std::time::Instant::now();
+    let mut csv = csv::Writer::from_path(resultados_dir.join("practica_distribucion.csv"))?;
+    csv.write_record([
+        "instancia", "variante", "plantas", "Z", "Z_por_planta", "pares_inmediatos_misma_especie",
+        "Z_nivel1", "Z_nivel2", "Z_nivel3", "Z_nivel4", "Z_nivel5", "Z_otro",
+    ])?;
+    for (nombre, area) in &pedidas {
+        let inst =
+            Instancia::nueva(nombre, *area, &datos, config, config.m_escala, config.usar_s2);
+        let e0 = generar(inst.malla.len(), inst.area, inst.map_id, 0, config.semilla, &mc);
+        let m = leer_m_omega0(&resultados_dir.join("paso3_escenarios.csv"), nombre)?;
+        let i = patron_serpentina(&inst.malla, DEFAULT_ROW_SEQUENCE, inst.d_tot);
+        let mut ii = i.clone();
+        reparar_a_banda(&mut ii, &inst.banda);
+        let iii = serpentina_con_existentes(&inst.malla, &e0.posiciones, DEFAULT_ROW_SEQUENCE, m);
+        let sin = leer_patron(&resultados_dir.join(format!("paso1_patron_{nombre}.csv")))?;
+        let con = leer_patron(&resultados_dir.join(format!("paso3_patron_{nombre}_omega0.csv")))?;
+        let variantes = [
+            ("i_serpentina", &i),
+            ("ii_serpentina_banda", &ii),
+            ("iii_serpentina_existentes", &iii),
+            ("tabu_sin_existentes", &sin),
+            ("tabu_con_existentes", &con),
+        ];
+        for (variante, phi) in variantes {
+            let d = desglose(phi, &inst.grafo, &inst.tabla, &datos.especies, &w);
+            let mut fila = vec![
+                nombre.clone(),
+                variante.to_string(),
+                d.plantas.to_string(),
+                d.z.to_string(),
+                (if d.plantas > 0 { d.z / d.plantas as f64 } else { 0.0 }).to_string(),
+                d.pares_inmediatos.to_string(),
+            ];
+            fila.extend(d.niveles.iter().map(|x| x.to_string()));
+            csv.write_record(&fila)?;
+        }
+        if nombre == "1ha" || nombre == "map_27" {
+            let mut patron = csv::Writer::from_path(
+                resultados_dir.join(format!("practica_patron_{nombre}_iii.csv")),
+            )?;
+            patron.write_record(["pos", "fila", "col", "x", "y", "especie", "existente"])?;
+            let existentes: std::collections::HashSet<usize> =
+                e0.posiciones.iter().map(|p| p.0).collect();
+            for (u, p) in inst.malla.posiciones.iter().enumerate() {
+                patron.write_record([
+                    u.to_string(),
+                    p.fila.to_string(),
+                    p.col.to_string(),
+                    p.x.to_string(),
+                    p.y.to_string(),
+                    (iii[u] as i32 - 1).to_string(),
+                    (existentes.contains(&u) as u8).to_string(),
+                ])?;
+            }
+            patron.flush()?;
+        }
+    }
+    csv.flush()?;
+    println!("practica: {:.1} s", inicio.elapsed().as_secs_f64());
     Ok(())
 }

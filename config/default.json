@@ -5,7 +5,7 @@
   "factor_radios": 1.0,
   "tolerancia": 1e-6,
   "gammas": [0.0, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0],
-  "gamma_star": 1.0,
+  "gamma_star": 3.0,
   "n_semillas": 3,
   "semilla": 20261017,
   "m_escala": 1.0,

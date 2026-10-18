@@ -307,10 +307,10 @@ fn paso1_solo_gamma_star_corre_un_solo_gamma_y_valida_despues_de_set() {
     };
     let salida = base(&[]);
     assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
-    let resumen = std::fs::read_to_string(resultados.join("paso1_resumen_gamma.csv")).unwrap();
-    assert_eq!(resumen.lines().count(), 2, "sólo γ*: una fila por instancia");
-    let barrido = std::fs::read_to_string(resultados.join("paso1_barrido_gamma.csv")).unwrap();
-    assert_eq!(barrido.lines().count(), 3, "γ* × 2 semillas");
+    assert!(!resultados.join("paso1_resumen_gamma.csv").exists(), "no pisa el barrido");
+    assert!(!resultados.join("paso1_barrido_gamma.csv").exists(), "no pisa el barrido");
+    let estrella = std::fs::read_to_string(resultados.join("paso1_gamma_star.csv")).unwrap();
+    assert_eq!(estrella.lines().count(), 3, "γ* × 2 semillas");
     // Un --set inválido (n_semillas=0) falla aunque venga después de los demás.
     let salida = base(&["--set", "n_semillas=0"]);
     assert!(!salida.status.success());

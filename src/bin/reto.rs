@@ -217,8 +217,13 @@ fn paso1(
         elegidas.push((instancia, estrella));
     }
 
-    escribir_barrido_gamma(&resultados_dir.join("paso1_barrido_gamma.csv"), &todas)?;
-    escribir_resumen_gamma(&resultados_dir.join("paso1_resumen_gamma.csv"), &todas)?;
+    if solo_star {
+        // No pisa el barrido de γ ya publicado.
+        escribir_barrido_gamma(&resultados_dir.join("paso1_gamma_star.csv"), &todas)?;
+    } else {
+        escribir_barrido_gamma(&resultados_dir.join("paso1_barrido_gamma.csv"), &todas)?;
+        escribir_resumen_gamma(&resultados_dir.join("paso1_resumen_gamma.csv"), &todas)?;
+    }
     let pares: Vec<(&Instancia, &FilaPaso1)> = elegidas.iter().map(|(i, f)| (i, f)).collect();
     escribir_composicion_paso1(&resultados_dir.join("paso1_composicion.csv"), &pares)?;
     for (instancia, fila) in &elegidas {

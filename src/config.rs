@@ -89,7 +89,7 @@ impl Default for Config {
             factor_radios: 1.0,
             tolerancia: 1e-6,
             gammas: vec![0.0, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0],
-            gamma_star: 1.0,
+            gamma_star: 3.0,
             n_semillas: 3,
             semilla: 20_261_017,
             m_escala: 1.0,
@@ -296,7 +296,7 @@ mod tests {
     fn defaults_del_paso1_y_json_coinciden() {
         let c = Config::default();
         assert_eq!(c.gammas, vec![0.0, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0]);
-        assert_eq!((c.gamma_star, c.n_semillas, c.semilla), (1.0, 3, 20261017));
+        assert_eq!((c.gamma_star, c.n_semillas, c.semilla), (3.0, 3, 20261017));
         assert_eq!(c.tabu.max_iter, 20_000);
         let del_archivo = Config::cargar(std::path::Path::new("config/default.json")).unwrap();
         assert_eq!(del_archivo.gammas, c.gammas);

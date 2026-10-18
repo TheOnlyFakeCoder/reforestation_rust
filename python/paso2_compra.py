@@ -112,7 +112,7 @@ def correr(resultados=None, salida=None):
                 fila["costo_voceador"] = float(c @ qv)
                 filas.append(fila)
     out = Path(salida or res / "paso2_compra.csv")
-    pd.DataFrame(filas).to_csv(out, index=False)
+    pd.DataFrame(filas).to_csv(out, index=False, float_format="%.6f")
     return len(filas)
 
 

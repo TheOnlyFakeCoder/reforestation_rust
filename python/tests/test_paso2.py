@@ -55,3 +55,22 @@ def test_cargar_instancia(tmp_path):
         tmp_path / "escenarios_X_1ha.csv", index=False)
     X = cargar_instancia(tmp_path / "escenarios_X_1ha.csv")
     assert X.shape == (1, 10) and X[0, 9] == 9
+
+
+def test_csv_salida_con_a_lo_mas_6_decimales(tmp_path):
+    from paso2_compra import correr
+    D = [40, 100, 40, 40, 50, 40, 70, 60, 90, 30]
+    fila = {"instancia": "1ha", "map_id": 0, "area_ha": 1.28, "d_tot": 590}
+    fila.update({f"D_{j}": D[j] for j in range(10)})
+    fila.update({f"Dnom_{j}": D[j] - 3 for j in range(10)})
+    pd.DataFrame([fila]).to_csv(tmp_path / "paso1_composicion.csv", index=False)
+    cols = ["omega", "T"] + [f"X_{j}" for j in range(10)]
+    filas = [[w, 0] + list(RNG.integers(0, 60, 10)) for w in range(21)]
+    pd.DataFrame(filas, columns=cols).to_csv(tmp_path / "escenarios_X_1ha.csv", index=False)
+    assert correr(tmp_path) == 6
+    df = pd.read_csv(tmp_path / "paso2_compra.csv", dtype=str)
+    for col in df.columns:
+        for v in df[col]:
+            if "." in v:
+                assert len(v.split(".")[1]) <= 6
+    assert df["q_0"].str.fullmatch(r"\d+").all()

@@ -316,3 +316,42 @@ fn paso1_solo_gamma_star_corre_un_solo_gamma_y_valida_despues_de_set() {
     assert!(!salida.status.success());
     assert!(String::from_utf8_lossy(&salida.stderr).contains("n_semillas"));
 }
+
+#[test]
+fn montecarlo_escribe_escenarios_y_resumenes() {
+    let datos = dir_temporal("mc_datos");
+    let resultados = dir_temporal("mc_resultados");
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    let comunes = |sub: &'static str| {
+        vec![
+            sub,
+            "--datos",
+            datos.to_str().unwrap(),
+            "--resultados",
+            resultados.to_str().unwrap(),
+            "--instancias",
+            "1ha",
+            "--set",
+            TABU_CORTO,
+        ]
+    };
+    let mut args = comunes("paso1");
+    args.extend(["--solo-gamma-star", "--set", "n_semillas=1"]);
+    assert!(reto(&args).status.success());
+    std::fs::write(
+        resultados.join("mc_params.json"),
+        r#"{"mu":129.0,"sigma":3.3,"p_hat":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]}"#,
+    )
+    .unwrap();
+    let mut args = comunes("montecarlo");
+    args.extend(["--set", "n_escenarios=20"]);
+    let salida = reto(&args);
+    assert!(salida.status.success(), "{}", String::from_utf8_lossy(&salida.stderr));
+    let x = std::fs::read_to_string(resultados.join("escenarios_X_1ha.csv")).unwrap();
+    assert_eq!(x.lines().count(), 21);
+    assert!(x.starts_with("omega,T,X_0,"));
+    let esp = std::fs::read_to_string(resultados.join("mc_resumen_especies.csv")).unwrap();
+    assert_eq!(esp.lines().count(), 1 + 2 * 10);
+    let costo = std::fs::read_to_string(resultados.join("mc_resumen_costo.csv")).unwrap();
+    assert_eq!(costo.lines().count(), 3);
+}

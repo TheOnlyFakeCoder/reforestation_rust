@@ -3,14 +3,17 @@
 //! Uso: `reto <subcomando> [--datos DIR] [--resultados DIR]`
 //!   datos   escribe `DIR/*.csv` con los datos del reto
 //!   malla   |V|, D_tot y pares por anillo de 1 ha y de cada polígono; exporta W
-//!   paso1   barrido de γ y patrón base [--instancias 1ha,map_27|todas] [--solo-gamma-star]
+//!   montecarlo  escenarios de existentes y resúmenes de C y costo [--instancias …|todas]
+//!   paso1  barrido de γ y patrón base [--instancias 1ha,map_27|todas] [--solo-gamma-star]
 
 use std::path::Path;
 use std::process::ExitCode;
 
 use reforestation::competencia::matriz_w;
 use reforestation::config::Config;
-use reforestation::datos::Datos;
+use reforestation::datos::{Datos, N_ESPECIES};
+use reforestation::escenarios::{generar, resumir, Escenario, ParamsMc};
+use reforestation::malla::Malla;
 use reforestation::paso1::{barrido_gamma, mejor_fila, FilaPaso1, Instancia};
 use reforestation::reportes::{
     escribir_alcance, escribir_anillos, escribir_barrido_gamma, escribir_composicion_paso1,
@@ -110,6 +113,11 @@ fn ejecutar(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
                 solo_star,
             )
         }
+        Some("montecarlo") => {
+            let config = cargar_config(args)?;
+            let instancias = opcion(args, "--instancias", "1ha,map_27")?;
+            montecarlo(Path::new(&datos_dir), Path::new(&resultados_dir), &config, &instancias)
+        }
         otro => Err(format!("subcomando desconocido: {}", otro.unwrap_or("")).into()),
     }
 }
@@ -163,15 +171,11 @@ fn malla(
     Ok(())
 }
 
-fn paso1(
-    datos_dir: &Path,
-    resultados_dir: &Path,
-    config: &Config,
+/// "todas", "1ha" o "map_<id>" separados por comas, con su área.
+fn resolver_instancias(
+    datos: &Datos,
     instancias: &str,
-    solo_star: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let datos = Datos::cargar(datos_dir)?;
-    std::fs::create_dir_all(resultados_dir)?;
+) -> Result<Vec<(String, f64)>, Box<dyn std::error::Error>> {
     let mut pedidas: Vec<(String, f64)> = Vec::new();
     for nombre in instancias.split(',').map(str::trim).filter(|n| !n.is_empty()) {
         if nombre == "todas" {
@@ -191,6 +195,135 @@ fn paso1(
     if pedidas.is_empty() {
         return Err("--instancias no nombra ninguna instancia".into());
     }
+    Ok(pedidas)
+}
+
+/// (D*, D nominal, L) de una instancia en `paso1_composicion.csv`.
+type Composicion = ([u32; N_ESPECIES], [u32; N_ESPECIES], [u32; N_ESPECIES]);
+
+fn leer_composicion(path: &Path, nombre: &str) -> Result<Composicion, Box<dyn std::error::Error>> {
+    let mut lector = csv::Reader::from_path(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let encabezado = lector.headers()?.clone();
+    for registro in lector.records() {
+        let registro = registro?;
+        if registro.get(0) != Some(nombre) {
+            continue;
+        }
+        let tomar = |prefijo: &str| -> Result<[u32; N_ESPECIES], Box<dyn std::error::Error>> {
+            let mut v = [0u32; N_ESPECIES];
+            for (j, x) in v.iter_mut().enumerate() {
+                let columna = format!("{prefijo}_{j}");
+                let i = encabezado
+                    .iter()
+                    .position(|h| h == columna)
+                    .ok_or_else(|| format!("falta la columna {columna}"))?;
+                *x = registro[i].parse()?;
+            }
+            Ok(v)
+        };
+        return Ok((tomar("D")?, tomar("Dnom")?, tomar("L")?));
+    }
+    Err(format!("{}: no tiene la instancia {nombre}", path.display()).into())
+}
+
+fn escribir_escenarios(
+    path: &Path,
+    escenarios: &[Escenario],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut csv = csv::Writer::from_path(path)?;
+    let mut encabezado = vec!["omega".to_string(), "T".to_string()];
+    encabezado.extend((0..N_ESPECIES).map(|j| format!("X_{j}")));
+    csv.write_record(&encabezado)?;
+    for e in escenarios {
+        let mut r = vec![e.omega.to_string(), e.t.to_string()];
+        r.extend(e.x.iter().map(|x| x.to_string()));
+        csv.write_record(&r)?;
+    }
+    csv.flush()?;
+    Ok(())
+}
+
+fn montecarlo(
+    datos_dir: &Path,
+    resultados_dir: &Path,
+    config: &Config,
+    instancias: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let datos = Datos::cargar(datos_dir)?;
+    let pedidas = resolver_instancias(&datos, instancias)?;
+    let params = ParamsMc::leer(&resultados_dir.join("mc_params.json"))?;
+    let composicion = resultados_dir.join("paso1_composicion.csv");
+    let costos: [f64; N_ESPECIES] = std::array::from_fn(|j| datos.especies[j].c);
+    let inicio = std::time::Instant::now();
+
+    let mut esp = csv::Writer::from_path(resultados_dir.join("mc_resumen_especies.csv"))?;
+    esp.write_record([
+        "instancia", "map_id", "composicion", "especie", "D", "E_C", "sd_C", "ic95_inf",
+        "ic95_sup", "P90", "P95", "N_necesario",
+    ])?;
+    let mut cos = csv::Writer::from_path(resultados_dir.join("mc_resumen_costo.csv"))?;
+    cos.write_record([
+        "instancia", "map_id", "composicion", "costo_esperado", "costo_sd", "presupuesto",
+        "P_costo_mayor_B", "violaciones_X_mayor_L", "escenarios_C_negativo", "especies_C_negativo",
+    ])?;
+    for (nombre, area) in &pedidas {
+        let map_id = nombre.strip_prefix("map_").and_then(|m| m.parse().ok()).unwrap_or(0u32);
+        let (d_star, d_nom, l) = leer_composicion(&composicion, nombre)?;
+        let d_tot = (datos.densidad_total() as f64 * area).round() as usize;
+        let n_pos = Malla::para_objetivo(d_tot, config.d).len();
+        let escenarios: Vec<_> = (0..config.n_escenarios)
+            .map(|omega| generar(n_pos, *area, map_id, omega, config.semilla, &params))
+            .collect();
+        escribir_escenarios(&resultados_dir.join(format!("escenarios_X_{nombre}.csv")), &escenarios)?;
+        for (etiqueta, d) in [("nominal", &d_nom), ("gamma_star", &d_star)] {
+            let (filas, costo) = resumir(&escenarios, d, &l, &costos, config.presupuesto_ha * area);
+            for f in &filas {
+                esp.write_record([
+                    nombre.clone(),
+                    map_id.to_string(),
+                    etiqueta.to_string(),
+                    f.especie.to_string(),
+                    f.d.to_string(),
+                    f.e_c.to_string(),
+                    f.sd_c.to_string(),
+                    f.ic95_inf.to_string(),
+                    f.ic95_sup.to_string(),
+                    f.p90.to_string(),
+                    f.p95.to_string(),
+                    f.n_necesario.to_string(),
+                ])?;
+            }
+            cos.write_record([
+                nombre.clone(),
+                map_id.to_string(),
+                etiqueta.to_string(),
+                costo.costo_esperado.to_string(),
+                costo.costo_sd.to_string(),
+                costo.presupuesto.to_string(),
+                costo.p_costo_mayor_b.to_string(),
+                costo.violaciones_x_mayor_l.to_string(),
+                costo.escenarios_c_negativo.to_string(),
+                costo.especies_c_negativo.to_string(),
+            ])?;
+        }
+        println!("{nombre}: |V| = {n_pos}, {} escenarios", escenarios.len());
+    }
+    esp.flush()?;
+    cos.flush()?;
+    println!("montecarlo: {:.1} s", inicio.elapsed().as_secs_f64());
+    Ok(())
+}
+
+fn paso1(
+    datos_dir: &Path,
+    resultados_dir: &Path,
+    config: &Config,
+    instancias: &str,
+    solo_star: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let datos = Datos::cargar(datos_dir)?;
+    std::fs::create_dir_all(resultados_dir)?;
+    let pedidas = resolver_instancias(&datos, instancias)?;
 
     let mut gammas = if solo_star { vec![] } else { config.gammas.clone() };
     if !gammas.contains(&config.gamma_star) {

@@ -38,15 +38,20 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Lee y valida un archivo de configuración.
     pub fn cargar(path: &Path) -> Result<Config, Box<dyn Error>> {
-        let texto =
-            std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let config: Config =
-            serde_json::from_str(&texto).map_err(|e| format!("{}: {e}", path.display()))?;
+        let config = Config::leer(path)?;
         config
             .validar()
             .map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(config)
+    }
+
+    /// Lee un archivo sin validarlo; el CLI valida después de aplicar los `--set`.
+    pub fn leer(path: &Path) -> Result<Config, Box<dyn Error>> {
+        let texto =
+            std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        Ok(serde_json::from_str(&texto).map_err(|e| format!("{}: {e}", path.display()))?)
     }
 
     /// Revisa que los parámetros tengan sentido; el mensaje nombra el campo que falla.
@@ -58,6 +63,14 @@ impl Config {
         }
         if no_positivo(self.tolerancia) {
             return Err(format!("tolerancia debe ser > 0 (vale {})", self.tolerancia));
+        }
+        // Los anillos más cercanos (√3·d y 2d) distan 0.27·d; una tolerancia mayor los juntaría.
+        if self.tolerancia >= 0.01 * self.d {
+            return Err(format!(
+                "tolerancia debe ser < 0.01·d = {} (vale {})",
+                0.01 * self.d,
+                self.tolerancia
+            ));
         }
         if !(0.0..1.0).contains(&self.epsilon) {
             return Err(format!("epsilon debe estar en [0, 1) (vale {})", self.epsilon));
@@ -71,25 +84,32 @@ impl Config {
         Ok(())
     }
 
-    /// Sobrescribe un campo con `"clave=valor"`; el valor se interpreta como JSON.
-    pub fn aplicar(&mut self, asignacion: &str) -> Result<(), String> {
-        let (clave, valor) = asignacion
-            .split_once('=')
-            .ok_or_else(|| format!("se esperaba clave=valor: {asignacion}"))?;
-        let clave = clave.trim();
-        let valor: serde_json::Value =
-            serde_json::from_str(valor.trim()).map_err(|e| format!("{asignacion}: {e}"))?;
+    /// Aplica todas las asignaciones `clave=valor` y valida una sola vez al final, de modo que
+    /// los `--set` puedan corregir un archivo inválido. Si algo falla, nada cambia.
+    pub fn aplicar_todas(&mut self, asignaciones: &[&str]) -> Result<(), String> {
         let mut json = serde_json::to_value(&*self).map_err(|e| e.to_string())?;
         let objeto = json.as_object_mut().expect("Config se serializa como objeto");
-        if !objeto.contains_key(clave) {
-            return Err(format!("clave desconocida: {clave}"));
+        for asignacion in asignaciones {
+            let (clave, valor) = asignacion
+                .split_once('=')
+                .ok_or_else(|| format!("se esperaba clave=valor: {asignacion}"))?;
+            let clave = clave.trim();
+            if !objeto.contains_key(clave) {
+                return Err(format!("clave desconocida: {clave}"));
+            }
+            let valor: serde_json::Value =
+                serde_json::from_str(valor.trim()).map_err(|e| format!("{asignacion}: {e}"))?;
+            objeto.insert(clave.to_string(), valor);
         }
-        objeto.insert(clave.to_string(), valor);
-        let nueva: Config =
-            serde_json::from_value(json).map_err(|e| format!("{asignacion}: {e}"))?;
+        let nueva: Config = serde_json::from_value(json).map_err(|e| e.to_string())?;
         nueva.validar()?;
         *self = nueva;
         Ok(())
+    }
+
+    /// Sobrescribe un campo con `"clave=valor"` (el valor se interpreta como JSON) y valida.
+    pub fn aplicar(&mut self, asignacion: &str) -> Result<(), String> {
+        self.aplicar_todas(&[asignacion])
     }
 }
 
@@ -209,5 +229,25 @@ mod tests {
     #[test]
     fn cargar_archivo_inexistente_es_error() {
         assert!(Config::cargar(std::path::Path::new("no/existe.json")).is_err());
+    }
+
+    #[test]
+    fn leer_no_valida_para_que_los_set_puedan_corregir() {
+        let path = std::env::temp_dir().join(format!("reto_leer_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"epsilon": 1.5}"#).unwrap();
+        let config = Config::leer(&path).unwrap();
+        assert_eq!(config.epsilon, 1.5);
+    }
+
+    #[test]
+    fn validar_rechaza_tolerancia_que_juntaria_anillos() {
+        // Los anillos más cercanos (√3·d y 2d) están a 0.27·d; tolerancia = 0.1·d ya es absurda.
+        let base = Config::default();
+        let config = Config {
+            tolerancia: 0.1 * base.d,
+            ..base
+        };
+        let error = config.validar().unwrap_err();
+        assert!(error.contains("tolerancia"), "{error}");
     }
 }

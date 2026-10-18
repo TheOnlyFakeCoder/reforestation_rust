@@ -41,7 +41,9 @@ Notación: J, V, d, D_j, q_j, X_j, C_j = D_j − X_j, w_jk, h_jk(δ), θ_j, γ, 
 
 ## 1. Malla
 
-Tresbolillo, d = sqrt(10000/(0.866·658)) ≈ 4.19 m (configurable). Polígono = cuadrado de área A.
+Tresbolillo, d = sqrt(10000/(0.866·658)) ≈ 4.19 m (configurable). Polígono = cuadrado de área A (sustituido el 2026-10-17 por un
+rectángulo casi cuadrado, ancho/alto ∈ [0.8, 1.25], con |V| ≥ round(658·A) y excedente mínimo, así
+que D_tot = round(658·A); ver `docs/superpowers/plans/2026-10-17-fase1b-malla-rectangular-validacion.md`).
 Coordenadas reales en metros. |V| ≈ 658·A (reportar |V| y pares por anillo para 1 ha y P1; en
 RESUMEN.md por polígono |V|, round(658·A) y diferencia). D_tot = min(|V|, round(658·A)).
 D̄_j por mayor residuo (Σ D̄_j = D_tot). L_j = ceil((1−ε)D̄_j), U_j = floor((1+ε)D̄_j), ε = 0.10

@@ -68,16 +68,20 @@ fn ejecutar(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             Ok(())
         }
         Some("malla") => {
+            // Se lee sin validar, se aplican todos los --set y se valida una sola vez.
             let mut config = match args.windows(2).find(|par| par[0] == "--config") {
-                Some(par) => Config::cargar(Path::new(&par[1]))?,
+                Some(par) => Config::leer(Path::new(&par[1]))?,
                 None if Path::new(CONFIG_POR_DEFECTO).exists() => {
-                    Config::cargar(Path::new(CONFIG_POR_DEFECTO))?
+                    Config::leer(Path::new(CONFIG_POR_DEFECTO))?
                 }
                 None => Config::default(),
             };
-            for par in args.windows(2).filter(|par| par[0] == "--set") {
-                config.aplicar(&par[1])?;
-            }
+            let asignaciones: Vec<&str> = args
+                .windows(2)
+                .filter(|par| par[0] == "--set")
+                .map(|par| par[1].as_str())
+                .collect();
+            config.aplicar_todas(&asignaciones)?;
             malla(Path::new(&datos_dir), Path::new(&resultados_dir), &config)
         }
         otro => Err(format!("subcomando desconocido: {}", otro.unwrap_or("")).into()),

@@ -181,3 +181,29 @@ fn config_json_cambia_kappa_de_w() {
         "`reto malla --config ARCHIVO` ignoró el archivo (kappa = 0.4): W[0][1] = {w01}, se esperaba 0.3736"
     );
 }
+
+#[test]
+fn la_validacion_corre_despues_de_todos_los_set() {
+    let datos = dir_temporal("validar_al_final");
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()]).status.success());
+    let config = datos.join("config.json");
+    std::fs::write(&config, r#"{"epsilon": 1.5, "kappa": -1}"#).unwrap();
+    let salida = reto(&[
+        "malla",
+        "--datos",
+        datos.to_str().unwrap(),
+        "--resultados",
+        datos.to_str().unwrap(),
+        "--config",
+        config.to_str().unwrap(),
+        "--set",
+        "epsilon=0.1",
+        "--set",
+        "kappa=0.6",
+    ]);
+    assert!(
+        salida.status.success(),
+        "los --set corrigen el archivo y se valida al final: {}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
+}

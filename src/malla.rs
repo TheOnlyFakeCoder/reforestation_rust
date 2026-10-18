@@ -1,8 +1,9 @@
-//! Malla tresbolillo (hexagonal) sobre un cuadrado, con coordenadas en metros.
+//! Malla tresbolillo (hexagonal) con coordenadas en metros.
 //!
-//! Los centros quedan a medio paso del borde: x = d/2 + c·d en filas pares y x = d + c·d en
-//! impares; y = h/2 + f·h con h = d·√3/2. Así cada posición ocupa su celda hexagonal de área
-//! (√3/2)·d² dentro del cuadrado y |V| ≈ 658·A con d = 4.19 m.
+//! El modelo usa `Malla::para_objetivo`: un rectángulo casi cuadrado (ancho/alto ∈ [0.8, 1.25])
+//! con |V| ≥ round(658·A) y excedente mínimo, de modo que D_tot = round(658·A). Los centros
+//! quedan al menos a d/2 del borde: x = d/2 + c·d en filas pares y x = d + c·d en impares;
+//! y = h/2 + f·h con h = d·√3/2.
 
 /// sen 60° = √3/2: separación entre filas en múltiplos de d.
 pub const SENO_60: f64 = 0.866_025_403_784_438_6;
@@ -30,6 +31,8 @@ pub enum Disposicion {
 #[derive(Clone, Debug)]
 pub struct Malla {
     pub d: f64,
+    /// LEGACY: sólo lo llenan `cuadrada`/`cuadrado`; en mallas rectangulares vale 0. Usar
+    /// `ancho` y `alto`.
     pub lado: f64,
     pub ancho: f64,
     pub alto: f64,
@@ -56,12 +59,14 @@ pub struct Vecindad {
 }
 
 impl Malla {
-    /// Cuadrado de área `area_ha` hectáreas.
+    /// LEGACY: cuadrado de área `area_ha` hectáreas. Pierde hasta 2.7 % de posiciones por el borde
+    /// (map 12: 941 contra 967); reemplazado por `para_objetivo`.
     pub fn cuadrada(area_ha: f64, d: f64) -> Malla {
         Malla::cuadrado((area_ha * 10_000.0).sqrt(), d)
     }
 
-    /// Cuadrado de lado `lado` metros.
+    /// LEGACY: cuadrado de lado `lado` metros (ver `cuadrada`). Es el único constructor que llena
+    /// `lado`; `disposicion` se reporta como Alterna aunque las filas tengan igual largo.
     pub fn cuadrado(lado: f64, d: f64) -> Malla {
         let h = d * SENO_60;
         let mut posiciones = Vec::new();

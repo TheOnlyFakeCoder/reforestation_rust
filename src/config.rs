@@ -23,6 +23,61 @@ pub struct Config {
     pub factor_radios: f64,
     /// Tolerancia numérica al comparar distancias (m).
     pub tolerancia: f64,
+    /// Valores de γ del barrido del paso 1.
+    pub gammas: Vec<f64>,
+    /// γ* elegido para el resto del pipeline (provisional hasta ver la curva).
+    pub gamma_star: f64,
+    /// Semillas por γ: `semilla + k` para k en 0..n_semillas.
+    pub n_semillas: usize,
+    pub semilla: u64,
+    /// Multiplicador de m_j = m_escala·c_j en θ_j.
+    pub m_escala: f64,
+    /// Usar la supervivencia a 2 años en θ.
+    pub usar_s2: bool,
+    /// Presupuesto B ($/ha) del paso 2.
+    pub presupuesto_ha: f64,
+    pub n_escenarios: usize,
+    pub n_escenarios_paso3: usize,
+    /// π_j = pi_factor·c_j.
+    pub pi_factor: f64,
+    pub tabu: ConfigTabu,
+}
+
+/// Parámetros de la búsqueda tabú (sin semilla, que sale de `Config::semilla`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigTabu {
+    pub candidatos: usize,
+    pub tenure: usize,
+    pub max_iter: usize,
+    pub max_sin_mejora: usize,
+    pub prob_intercambio: f64,
+}
+
+impl Default for ConfigTabu {
+    fn default() -> Self {
+        ConfigTabu {
+            candidatos: 64,
+            tenure: 15,
+            max_iter: 20_000,
+            max_sin_mejora: 3_000,
+            prob_intercambio: 0.5,
+        }
+    }
+}
+
+impl ConfigTabu {
+    /// Parámetros de la búsqueda con la semilla dada.
+    pub fn params(&self, semilla: u64) -> crate::busqueda_tabu::ParamsTabu {
+        crate::busqueda_tabu::ParamsTabu {
+            candidatos: self.candidatos,
+            tenure: self.tenure,
+            max_iter: self.max_iter,
+            max_sin_mejora: self.max_sin_mejora,
+            prob_intercambio: self.prob_intercambio,
+            semilla,
+        }
+    }
 }
 
 impl Default for Config {
@@ -33,6 +88,17 @@ impl Default for Config {
             kappa: 0.6,
             factor_radios: 1.0,
             tolerancia: 1e-6,
+            gammas: vec![0.0, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0],
+            gamma_star: 1.0,
+            n_semillas: 3,
+            semilla: 20_261_017,
+            m_escala: 1.0,
+            usar_s2: false,
+            presupuesto_ha: 12_500.0,
+            n_escenarios: 1000,
+            n_escenarios_paso3: 100,
+            pi_factor: 2.0,
+            tabu: ConfigTabu::default(),
         }
     }
 }
@@ -80,6 +146,32 @@ impl Config {
         }
         if no_positivo(self.factor_radios) {
             return Err(format!("factor_radios debe ser > 0 (vale {})", self.factor_radios));
+        }
+        if self.gammas.iter().any(|g| g.is_nan() || *g < 0.0) {
+            return Err(format!("gammas debe tener valores ≥ 0 (vale {:?})", self.gammas));
+        }
+        if self.gamma_star.is_nan() || self.gamma_star < 0.0 {
+            return Err(format!("gamma_star debe ser ≥ 0 (vale {})", self.gamma_star));
+        }
+        if self.n_semillas < 1 {
+            return Err("n_semillas debe ser ≥ 1".to_string());
+        }
+        let t = &self.tabu;
+        for (nombre, valor) in [
+            ("tabu.candidatos", t.candidatos),
+            ("tabu.tenure", t.tenure),
+            ("tabu.max_iter", t.max_iter),
+            ("tabu.max_sin_mejora", t.max_sin_mejora),
+        ] {
+            if valor == 0 {
+                return Err(format!("{nombre} debe ser > 0"));
+            }
+        }
+        if !(0.0..=1.0).contains(&t.prob_intercambio) {
+            return Err(format!(
+                "tabu.prob_intercambio debe estar en [0, 1] (vale {})",
+                t.prob_intercambio
+            ));
         }
         Ok(())
     }
@@ -198,6 +290,43 @@ mod tests {
         };
         let error = config.validar().unwrap_err();
         assert!(error.contains("kappa"), "{error}");
+    }
+
+    #[test]
+    fn defaults_del_paso1_y_json_coinciden() {
+        let c = Config::default();
+        assert_eq!(c.gammas, vec![0.0, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0]);
+        assert_eq!((c.gamma_star, c.n_semillas, c.semilla), (1.0, 3, 20261017));
+        assert_eq!(c.tabu.max_iter, 20_000);
+        let del_archivo = Config::cargar(std::path::Path::new("config/default.json")).unwrap();
+        assert_eq!(del_archivo.gammas, c.gammas);
+        assert_eq!(del_archivo.tabu, c.tabu);
+        assert_eq!(del_archivo.n_escenarios_paso3, 100);
+        assert_eq!(del_archivo.presupuesto_ha, 12_500.0);
+        assert_eq!(del_archivo.pi_factor, 2.0);
+    }
+
+    #[test]
+    fn validar_rechaza_gamma_negativa_semillas_cero_y_tabu_invalido() {
+        let mut c = Config::default();
+        c.gammas = vec![0.0, -1.0];
+        assert!(c.validar().unwrap_err().contains("gammas"));
+        let c = Config { n_semillas: 0, ..Config::default() };
+        assert!(c.validar().unwrap_err().contains("n_semillas"));
+        let mut c = Config::default();
+        c.tabu.tenure = 0;
+        assert!(c.validar().unwrap_err().contains("tabu.tenure"));
+        let mut c = Config::default();
+        c.tabu.prob_intercambio = 1.5;
+        assert!(c.validar().unwrap_err().contains("prob_intercambio"));
+    }
+
+    #[test]
+    fn set_acepta_un_objeto_json_para_tabu() {
+        let mut c = Config::default();
+        c.aplicar(r#"tabu={"candidatos":20,"tenure":5,"max_iter":200,"max_sin_mejora":200,"prob_intercambio":0.5}"#)
+            .unwrap();
+        assert_eq!((c.tabu.candidatos, c.tabu.max_iter), (20, 200));
     }
 
     #[test]

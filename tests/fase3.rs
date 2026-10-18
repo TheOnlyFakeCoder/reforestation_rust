@@ -182,3 +182,107 @@ fn cuotas_respeta_fijas_cuotas_y_total_y_el_delta_es_coherente() {
     assert!((r.objetivo - problema.objetivo(&r.phi)).abs() < 1e-9);
     assert!(r.objetivo < problema.objetivo(&phi) - 1.0, "no mejora");
 }
+
+// ---------- Paso 3: cuotas, inicial y escenario ----------
+
+use reforestation::paso3::{construir_inicial, cuotas, Caso};
+
+#[test]
+fn cuotas_n_y_m_y_los_tres_casos() {
+    let d = [10u32, 10, 10, 10, 10, 10, 10, 10, 10, 10];
+    // X_0 = 12 > D_0: C_0 = -2 -> C+ = 0. El resto C = 4.
+    let mut x = [6u32; 10];
+    x[0] = 12;
+    let q = [5u32; 10];
+    let (n, m, caso) = cuotas(&q, &d, &x, 1000);
+    assert_eq!(n, vec![0, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
+    assert_eq!((m, caso), (36, Caso::PresupuestoCorto));
+    // Hay exactamente 36 libres: usual.
+    let (_, m, caso) = cuotas(&q, &d, &x, 36);
+    assert_eq!((m, caso), (36, Caso::Usual));
+    // Sólo 30 libres: existentes de sobra, M = |V_lib|.
+    let (n, m, caso) = cuotas(&q, &d, &x, 30);
+    assert_eq!((m, caso), (30, Caso::ExistentesDeSobra));
+    assert_eq!(n.iter().sum::<usize>(), 36);
+    // n_j = min(q, C+): q = 2 recorta.
+    let (n, _, _) = cuotas(&[2; 10], &d, &x, 1000);
+    assert_eq!(n[1], 2);
+}
+
+#[test]
+fn inicial_deja_existentes_fijas_y_cumple_cuotas_y_total() {
+    // 12 posiciones; base: especies 1..3 repetidas; 3 existentes.
+    let base: Vec<u8> = (0..12).map(|u| (u % 3) as u8 + 1).collect();
+    let existentes = vec![(0usize, 5u8), (1, 5), (7, 9)];
+    let mut n = vec![0usize; 10];
+    n[0] = 2; // base trae 3 de la especie 1 (libres) -> sobrantes a vacía
+    n[1] = 4; // faltantes: se llenan en vacías libres
+    n[2] = 1;
+    let m = 7;
+    let (phi, fija) = construir_inicial(&base, &existentes, &n, m);
+    assert_eq!(phi[0], 6);
+    assert_eq!(phi[1], 6);
+    assert_eq!(phi[7], 10);
+    assert!(fija[0] && fija[1] && fija[7]);
+    assert_eq!(fija.iter().filter(|&&f| f).count(), 3);
+    let mut c = [0usize; 11];
+    for u in 0..12 {
+        if !fija[u] {
+            c[phi[u] as usize] += 1;
+        }
+    }
+    for j in 0..10 {
+        assert!(c[j + 1] <= n[j]);
+    }
+    assert_eq!(c[1..].iter().sum::<usize>(), m);
+}
+
+#[test]
+fn x_regenerado_coincide_con_el_csv_de_escenarios_y_el_paso3_respeta_todo() {
+    use reforestation::escenarios::{generar, ParamsMc};
+    use reforestation::paso1::Instancia;
+    use reforestation::paso3::{leer_patron, resolver_escenario};
+    let raiz = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("results");
+    let config = Config::default();
+    let datos = Datos::base();
+    let inst = Instancia::nueva("1ha", 1.0, &datos, &config, 1.0, false);
+    let mc = ParamsMc::leer(&raiz.join("mc_params.json")).unwrap();
+    // Fila del CSV de escenarios.
+    let mut lector = csv::Reader::from_path(raiz.join("escenarios_X_1ha.csv")).unwrap();
+    let filas: Vec<csv::StringRecord> = lector.records().map(|r| r.unwrap()).collect();
+    for omega in [0usize, 7] {
+        let e = generar(inst.malla.len(), inst.area, 0, omega, config.semilla, &mc);
+        let fila = &filas[omega];
+        assert_eq!(fila[1].parse::<usize>().unwrap(), e.t);
+        for j in 0..10 {
+            assert_eq!(fila[2 + j].parse::<u32>().unwrap(), e.x[j], "X_{j} de omega {omega}");
+        }
+    }
+    // Paso 3 con q sintético (C+ + 3 de holgura).
+    let base = leer_patron(&raiz.join("paso1_patron_1ha.csv")).unwrap();
+    let mut d = [0u32; 10];
+    for &c in base.iter().filter(|&&c| c > 0) {
+        d[c as usize - 1] += 1;
+    }
+    let e = generar(inst.malla.len(), inst.area, 0, 0, config.semilla, &mc);
+    let q: [u32; 10] = std::array::from_fn(|j| d[j].saturating_sub(e.x[j]) + 3);
+    let params = ParamsTabu { max_iter: 300, max_sin_mejora: 300, ..config.tabu.params(1) };
+    let (fila, phi) = resolver_escenario(&inst, &base, &q, &d, &e, &params);
+    for &(u, j) in &e.posiciones {
+        assert_eq!(phi[u], j + 1, "existente movida");
+    }
+    let (n, m, _) = reforestation::paso3::cuotas(&q, &d, &e.x, fila.v_lib);
+    let mut nuevas = [0usize; 10];
+    let existentes: std::collections::HashSet<usize> = e.posiciones.iter().map(|p| p.0).collect();
+    for u in 0..phi.len() {
+        if !existentes.contains(&u) && phi[u] > 0 {
+            nuevas[phi[u] as usize - 1] += 1;
+        }
+    }
+    for j in 0..10 {
+        assert!(nuevas[j] <= n[j]);
+    }
+    assert_eq!(nuevas.iter().sum::<usize>(), m);
+    assert_eq!(fila.m, m);
+    assert!((fila.z - z_total(&phi, &inst.grafo, &inst.tabla)).abs() < 1e-9);
+}

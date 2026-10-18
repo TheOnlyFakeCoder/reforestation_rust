@@ -16,6 +16,7 @@ pub mod map;
 pub mod matrix_handler;
 pub mod objetivo;
 pub mod paso1;
+pub mod paso3;
 pub mod reforestation;
 pub mod reportes;
 pub mod tabu;

@@ -1,6 +1,7 @@
 #![allow(clippy::needless_range_loop)]
 
 pub mod algorithm;
+pub mod busqueda_tabu;
 pub mod competition;
 pub mod composicion;
 pub mod competencia;

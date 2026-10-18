@@ -84,3 +84,255 @@ fn delta_coincide_con_recalculo_en_10000_movimientos() {
     }
     assert!(reasignaciones >= 4_900 && intercambios >= 4_900 && adyacentes >= 900);
 }
+
+/// Grafo y tabla w·h de 1 ha con la configuración por defecto (658 posiciones, sin vacías).
+fn instancia_1ha() -> (Grafo, TablaCompetencia, usize) {
+    use reforestation::competencia::{matriz_w, radio_max, radios};
+    use reforestation::config::Config;
+    use reforestation::datos::Datos;
+    let config = Config::default();
+    let especies = Datos::base().especies;
+    let r = radios(&especies, config.d, config.factor_radios);
+    let malla = Malla::para_objetivo(658, config.d);
+    let vecindad = malla.vecindad(radio_max(&r, config.d), config.tolerancia);
+    let w = matriz_w(&especies, config.kappa);
+    let tabla = TablaCompetencia::nueva(&w, &r, &vecindad.anillos, config.d, config.tolerancia);
+    (Grafo::desde(&vecindad), tabla, malla.len())
+}
+
+/// φ inicial reproducible: la composición nominal de 1 ha (δ_j) barajada con una semilla.
+fn phi_nominal_barajado(semilla: u64) -> Vec<u8> {
+    use rand::seq::SliceRandom;
+    use rand::SeedableRng;
+    let delta = [42, 196, 42, 42, 49, 38, 73, 64, 86, 26];
+    let mut phi: Vec<u8> = (0..10u8)
+        .flat_map(|j| std::iter::repeat(j + 1).take(delta[j as usize]))
+        .collect();
+    phi.shuffle(&mut rand_chacha::ChaCha8Rng::seed_from_u64(semilla));
+    phi
+}
+
+#[test]
+fn buscar_sin_iteraciones_devuelve_el_inicial_con_su_objetivo() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; n],
+        gamma: 2.0,
+        theta: [1.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    let params = ParamsTabu {
+        candidatos: 50,
+        tenure: 10,
+        max_iter: 0,
+        max_sin_mejora: 100,
+        prob_intercambio: 1.0,
+        semilla: 1,
+    };
+    let inicial = phi_nominal_barajado(3);
+    let resultado = buscar(&problema, inicial.clone(), &params);
+    let z = z_total(&inicial, &grafo, &tabla);
+    assert_eq!(resultado.phi, inicial);
+    assert!((resultado.z - z).abs() < 1e-9);
+    // γ·Z + Σ θ_j·D_j con θ = 1 y D_tot = 658.
+    assert!((resultado.objetivo - (2.0 * z + 658.0)).abs() < 1e-9);
+    assert_eq!(resultado.iteraciones, 0);
+}
+
+fn conteos(phi: &[u8]) -> [usize; 11] {
+    let mut c = [0usize; 11];
+    for &x in phi {
+        c[x as usize] += 1;
+    }
+    c
+}
+
+#[test]
+fn intercambios_mejoran_z_y_conservan_la_composicion() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; n],
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    let params = ParamsTabu {
+        candidatos: 50,
+        tenure: 10,
+        max_iter: 2_000,
+        max_sin_mejora: 2_000,
+        prob_intercambio: 1.0,
+        semilla: 1,
+    };
+    let inicial = phi_nominal_barajado(3);
+    let resultado = buscar(&problema, inicial.clone(), &params);
+    assert!(resultado.iteraciones > 0);
+    assert!(resultado.objetivo < problema.objetivo(&inicial) - 1.0);
+    assert!((resultado.objetivo - problema.objetivo(&resultado.phi)).abs() < 1e-9);
+    assert_eq!(conteos(&resultado.phi), conteos(&inicial));
+}
+
+#[test]
+fn las_posiciones_fijas_nunca_cambian() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    let fija: Vec<bool> = (0..n).map(|u| u % 5 == 0).collect();
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: fija.clone(),
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    let params = ParamsTabu {
+        candidatos: 50,
+        tenure: 10,
+        max_iter: 500,
+        max_sin_mejora: 500,
+        prob_intercambio: 1.0,
+        semilla: 1,
+    };
+    let inicial = phi_nominal_barajado(5);
+    let resultado = buscar(&problema, inicial.clone(), &params);
+    assert!(resultado.objetivo < problema.objetivo(&inicial));
+    for u in (0..n).filter(|&u| fija[u]) {
+        assert_eq!(resultado.phi[u], inicial[u], "la posición fija {u} cambió");
+    }
+}
+
+#[test]
+fn con_gamma_cero_la_banda_lleva_al_optimo_lineal_de_mortalidad() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    // θ_j = c_j·(1 − s1_j); L = ceil(0.9·δ), U = floor(1.1·δ) para 1 ha (calculados a mano).
+    let theta = [1.469, 1.0738, 4.563, 1.2558, 1.3104, 2.1294, 0.7632, 2.052, 4.7329, 3.0082];
+    let l = vec![38, 177, 38, 38, 45, 35, 66, 58, 78, 24];
+    let u = vec![46, 215, 46, 46, 53, 41, 80, 70, 94, 28];
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; n],
+        gamma: 0.0,
+        theta,
+        restriccion: Restriccion::Banda { l: l.clone(), u: u.clone() },
+    };
+    let params = ParamsTabu {
+        candidatos: 50,
+        tenure: 10,
+        max_iter: 3_000,
+        max_sin_mejora: 3_000,
+        prob_intercambio: 0.0,
+        semilla: 1,
+    };
+    let resultado = buscar(&problema, phi_nominal_barajado(7), &params);
+    let d = conteos(&resultado.phi);
+    // Óptimo de min Σθ·D con L ≤ D ≤ U y ΣD = 658 (verificado con un PLE en scipy).
+    assert!(
+        d[1..] == [38, 215, 38, 46, 46, 35, 80, 58, 78, 24],
+        "con γ = 0 y Restriccion::Banda, buscar() debe reasignar especies (a → b dentro de \
+         [L, U]) hasta el óptimo lineal [38, 215, 38, 46, 46, 35, 80, 58, 78, 24]; quedó {:?} \
+         (la composición no cambió: falta el movimiento de reasignación)",
+        &d[1..]
+    );
+}
+
+#[test]
+fn la_semilla_fija_el_resultado_y_otra_semilla_explora_distinto() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; n],
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    let params = |semilla| ParamsTabu {
+        candidatos: 50,
+        tenure: 10,
+        max_iter: 300,
+        max_sin_mejora: 300,
+        prob_intercambio: 1.0,
+        semilla,
+    };
+    let inicial = phi_nominal_barajado(9);
+    let a = buscar(&problema, inicial.clone(), &params(1));
+    let b = buscar(&problema, inicial.clone(), &params(1));
+    let c = buscar(&problema, inicial, &params(2));
+    assert!(a.phi == b.phi, "misma semilla, mismo resultado");
+    assert!(
+        a.phi != c.phi,
+        "con semilla 2 el resultado es idéntico al de semilla 1: buscar() no usa la semilla \
+         (los candidatos deben muestrearse al azar con ParamsTabu::semilla)"
+    );
+}
+
+#[test]
+fn se_detiene_tras_max_sin_mejora_iteraciones_sin_mejorar() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    // γ = 0 y composición fija: ningún intercambio cambia el objetivo, nunca hay mejora.
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; n],
+        gamma: 0.0,
+        theta: [1.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    let params = ParamsTabu {
+        candidatos: 10,
+        tenure: 10,
+        max_iter: 5_000,
+        max_sin_mejora: 25,
+        prob_intercambio: 1.0,
+        semilla: 1,
+    };
+    let resultado = buscar(&problema, phi_nominal_barajado(1), &params);
+    assert!(
+        resultado.iteraciones == 25,
+        "sin ninguna mejora debe parar a las max_sin_mejora = 25 iteraciones, no a las {}",
+        resultado.iteraciones
+    );
+}
+
+#[test]
+fn aplica_el_mejor_movimiento_aunque_empeore_y_devuelve_el_mejor_visto() {
+    use reforestation::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; n],
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    let params = ParamsTabu {
+        candidatos: 20,
+        tenure: 10,
+        max_iter: 3_000,
+        max_sin_mejora: 3_000,
+        prob_intercambio: 1.0,
+        semilla: 4,
+    };
+    let resultado = buscar(&problema, phi_nominal_barajado(2), &params);
+    let traza = &resultado.traza;
+    assert!(traza.len() == resultado.iteraciones, "una entrada de la traza por iteración");
+    let empeoro = traza.windows(2).any(|par| par[1] > par[0] + 1e-12);
+    assert!(empeoro, "la búsqueda tabú debe aceptar movimientos que empeoran (traza nunca sube)");
+    let minimo = traza.iter().copied().fold(f64::INFINITY, f64::min);
+    assert!(
+        (resultado.objetivo - minimo).abs() < 1e-6,
+        "debe devolver la mejor solución vista: objetivo {} contra mínimo de la traza {minimo}",
+        resultado.objetivo
+    );
+}

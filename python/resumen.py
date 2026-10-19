@@ -55,7 +55,7 @@ def _csv(origen, nombre):
 def _malla(o):
     r = _csv(o, "malla_resumen.csv")
     an = _csv(o, "malla_anillos.csv")
-    ren = {"n_pos": "\|V\|", "round_658A": "round(658·A)"}
+    ren = {"n_pos": "\\|V\\|", "round_658A": "round(658·A)"}
     sel = r[r["instancia"].isin(INSTANCIAS)]
     cols = ["instancia", "area_ha", "n_pos", "round_658A", "excedente", "d_tot"]
     pa = an[an["instancia"].isin(INSTANCIAS)].pivot(index="anillo", columns="instancia",

@@ -116,6 +116,91 @@ def fig_practica_compra(origen, salida, instancias=None):
     _guardar(fig, salida / "practica_compra.png")
 
 
+@figura("mapa")
+def fig_mapa(inst, origen, salida):
+    """Práctica de la socia (variante iii) contra el tabú del paso 3 (ω = 0) sobre la malla.
+    En los patrones especie = -1 es posición vacía y 0..9 es la especie."""
+    rutas = [origen / f"practica_patron_{inst}_iii.csv", origen / f"paso3_patron_{inst}_omega0.csv"]
+    faltan = [r.name for r in rutas if not r.exists()]
+    if faltan:
+        print(f"aviso: mapa_{inst} omitido, falta {', '.join(faltan)}")
+        return
+    pr = pd.read_csv(origen / "practica_distribucion.csv")
+    z_soc = pr[(pr["instancia"] == inst) & (pr["variante"] == "iii_serpentina_existentes")]["Z"]
+    p3 = pd.read_csv(origen / "paso3_escenarios.csv")
+    z_tabu = p3[(p3["instancia"] == inst) & (p3["omega"] == 0)]["Z"]
+    titulos = ["Práctica de la socia (serpentina)", "Tabú, paso 3 (ω = 0)"]
+    for k, z in enumerate([z_soc, z_tabu]):
+        if len(z):
+            titulos[k] += f"\nZ = {z.iloc[0]:.1f}"
+    cmap = plt.get_cmap("tab10")
+    nombres = _nombres_cortos()
+    fig, axs = plt.subplots(1, 2, figsize=(14, 8))
+    for ax, ruta, titulo in zip(axs, rutas, titulos):
+        d = pd.read_csv(ruta)
+        vac = d[d["especie"] < 0]
+        ax.scatter(vac["x"], vac["y"], s=18, facecolors="none", edgecolors="#bbbbbb", lw=0.6)
+        for j in range(J):
+            sj = d[d["especie"] == j]
+            nuevas = sj[sj["existente"] == 0]
+            exis = sj[sj["existente"] == 1]
+            ax.scatter(nuevas["x"], nuevas["y"], s=75, color=cmap(j), lw=0)
+            ax.scatter(exis["x"], exis["y"], s=75, color=cmap(j), edgecolors="black", lw=1.6)
+        ax.set_aspect("equal")
+        ax.invert_yaxis()
+        ax.set_xlabel("x (m)")
+        ax.set_ylabel("y (m)")
+        ax.set_title(titulo)
+    asas = [plt.Line2D([], [], marker="o", ls="", color=cmap(j), label=nombres[j]) for j in range(J)]
+    asas += [plt.Line2D([], [], marker="o", ls="", mfc="#999999", mec="black", mew=1.6, label="existente"),
+             plt.Line2D([], [], marker="o", ls="", mfc="none", mec="#bbbbbb", label="vacía")]
+    fig.legend(handles=asas, loc="lower center", ncol=6, fontsize=9, frameon=False)
+    fig.suptitle(f"Distribución de especies en {inst}")
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    Path(salida).mkdir(parents=True, exist_ok=True)
+    fig.savefig(Path(salida) / f"mapa_{inst}.png", dpi=300)
+    plt.close(fig)
+
+
+@figura("practica_distribucion", por_instancia=False)
+def fig_practica_distribucion(origen, salida, instancias=None):
+    d = pd.read_csv(origen / "practica_distribucion.csv")
+    d = d[d["instancia"].isin(instancias or INSTANCIAS)]
+    insts = list(dict.fromkeys(d["instancia"]))
+    variantes = ["i_serpentina", "ii_serpentina_banda", "iii_serpentina_existentes",
+                 "tabu_sin_existentes", "tabu_con_existentes"]
+    etqs = ["i\nserpentina", "ii\nserp. banda", "iii\nserp. exist.", "tabú\nsin exist.", "tabú\ncon exist."]
+    fig, axs = plt.subplots(len(insts), 2, figsize=(13, 4.6 * len(insts)), squeeze=False)
+    niveles = [f"Z_nivel{k}" for k in range(1, 6)] + ["Z_otro"]
+    col_niv = ["#1b6ca8", "#d95f02", "#1b9e77", "#7570b3", "#e6ab02", "#999999"]
+    x = np.arange(len(variantes))
+    for fila, inst in enumerate(insts):
+        s = d[d["instancia"] == inst].set_index("variante").reindex(variantes)
+        ax = axs[fila, 0]
+        ax.bar(x, s["Z"], color=["#999999"] * 3 + ["#1b6ca8", "#1b9e77"])
+        for xi, z, p in zip(x, s["Z"], s["pares_inmediatos_misma_especie"]):
+            ax.annotate(f"{z:.0f}\n{int(p)} pares", (xi, z), ha="center", va="bottom", fontsize=8)
+        ax.set_xticks(x)
+        ax.set_xticklabels(etqs, fontsize=8)
+        ax.set_ylabel("Z (competencia total)")
+        ax.set_ylim(0, s["Z"].max() * 1.18)
+        ax.set_title(f"Z por variante ({inst}); pares inmediatos de la misma especie")
+        ax = axs[fila, 1]
+        base = np.zeros(len(variantes))
+        for c, col in zip(niveles, col_niv):
+            ax.bar(x, s[c], bottom=base, color=col,
+                   label=c.replace("Z_nivel", "nivel ").replace("Z_otro", "otro"))
+            base += s[c].to_numpy()
+        ax.set_xticks(x)
+        ax.set_xticklabels(etqs, fontsize=8)
+        ax.set_ylabel("Z por nivel de competencia")
+        ax.set_title(f"Z por nivel de competencia 1-5 ({inst})")
+        ax.set_ylim(0, base.max() * 1.15)
+        if fila == 0:
+            ax.legend(fontsize=8, ncol=6, loc="upper center")
+    _guardar(fig, salida / "practica_distribucion.png")
+
+
 def main(nombres=None, instancias=None, origen=None, salida=None):
     origen = Path(origen or RAIZ / "results")
     salida = Path(salida or RAIZ / "figures")

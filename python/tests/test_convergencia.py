@@ -57,7 +57,7 @@ def fila(inst, z, t1=0.1, t2=0.2):
 def test_referencia_dif_rel(tmp_path):
     fin, ref = tmp_path / "fin", tmp_path / "ref"
     fin.mkdir(), ref.mkdir()
-    pd.DataFrame([fila("m", 100.0), fila("m", 102.0), fila("n", 50.0)]).to_csv(
+    pd.DataFrame([fila("m", 100.0), fila("m", 102.0), fila("n", 50.0), fila("otra", 1.0)]).to_csv(
         fin / "paso1_gamma_star.csv", index=False)
     pd.DataFrame([fila("m", 100.0), fila("m", 100.0), fila("n", 50.0)]).to_csv(
         ref / "paso1_gamma_star.csv", index=False)
@@ -76,3 +76,4 @@ def test_referencia_dif_rel(tmp_path):
     assert m_fin.tiempo_medio_s == pytest.approx(0.15)
     n_ref = t[(t.instancia == "n") & (t.corrida == "referencia")].iloc[0]
     assert n_ref.max_iter_efectivo == 20000  # max(20000, 500*20=10000)
+    assert set(t.instancia) == {"m", "n"}  # ignora instancias fuera de la referencia

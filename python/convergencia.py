@@ -55,17 +55,19 @@ def referencia(res_final, res_ref, params_final, params_ref, n_pos,
     """Compara z_opt medio (paso 1, γ*) de la corrida final contra la de referencia."""
     filas = []
     z = {}
+    en_ref = set(pd.read_csv(Path(res_ref) / "paso1_gamma_star.csv").instancia)
     for corrida, res, p in (("final", res_final, params_final),
                             ("referencia", res_ref, params_ref)):
         df = pd.read_csv(Path(res) / "paso1_gamma_star.csv")
+        df = df[df.instancia.isin(en_ref)]
         for inst, g in df.groupby("instancia", sort=False):
             z[(corrida, inst)] = g.z_opt.mean()
             filas.append(dict(
                 instancia=inst, corrida=corrida, candidatos=p["candidatos"],
                 tenure=p["tenure"], iter_por_posicion=p["iter_por_posicion"],
                 sin_mejora_por_posicion=p["sin_mejora_por_posicion"],
-                max_iter_efectivo=max(max_iter, p["iter_por_posicion"] * n_pos[inst]),
-                max_sin_mejora_efectivo=max(max_sin_mejora,
+                max_iter_efectivo=max(p.get("max_iter", max_iter), p["iter_por_posicion"] * n_pos[inst]),
+                max_sin_mejora_efectivo=max(p.get("max_sin_mejora", max_sin_mejora),
                                             p["sin_mejora_por_posicion"] * n_pos[inst]),
                 z_opt_media=g.z_opt.mean(), z_opt_sd=g.z_opt.std(ddof=1),
                 tiempo_medio_s=(g.tiempo_paso1_s + g.tiempo_opt_s).mean() / 2))

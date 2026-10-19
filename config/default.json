@@ -15,12 +15,12 @@
   "n_escenarios_paso3": 100,
   "pi_factor": 2.0,
   "tabu": {
-    "candidatos": 64,
-    "tenure": 15,
+    "candidatos": 128,
+    "tenure": 25,
     "max_iter": 20000,
     "max_sin_mejora": 3000,
     "prob_intercambio": 0.5,
-    "iter_por_posicion": 50,
-    "sin_mejora_por_posicion": 0
+    "iter_por_posicion": 100,
+    "sin_mejora_por_posicion": 4
   }
 }

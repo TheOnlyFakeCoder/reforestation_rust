@@ -11,14 +11,17 @@ import numpy as np
 import pandas as pd
 
 try:
-    from comun import RAIZ, leer_especies
+    from comun import RAIZ, leer_config, leer_especies
 except ImportError:
-    from python.comun import RAIZ, leer_especies
+    from python.comun import RAIZ, leer_config, leer_especies
 
 J = 10
-GAMMA_ESTRELLA = 3
 INSTANCIAS = ["1ha", "map_27"]
 FIGURAS = {}
+
+
+def gamma_estrella():
+    return float(leer_config()["gamma_star"])
 
 
 def figura(nombre, por_instancia=True):
@@ -65,10 +68,11 @@ def fig_curva(inst, origen, salida):
     ax.errorbar(x, y, yerr=err, fmt="o-", color="#1b6ca8", capsize=3, lw=1.2)
     for xi, yi, g in zip(x, y, r["gamma"]):
         ax.annotate(f"{g:g}", (xi, yi), textcoords="offset points", xytext=(5, 5), fontsize=8)
+    GAMMA_ESTRELLA = gamma_estrella()
     e = r[np.isclose(r["gamma"], GAMMA_ESTRELLA)]
     if len(e):
         ax.plot(e["suma_theta_d"], e["z_opt_media"], "*", color="#d95f02", ms=16,
-                label=f"γ* = {GAMMA_ESTRELLA}", zorder=5)
+                label=f"γ* = {GAMMA_ESTRELLA:g}", zorder=5)
         ax.legend()
     ax.set_xlabel("Σ θ_j · D_j (costo de mortalidad esperada)")
     ax.set_ylabel("Z_opt medio (min–máx entre semillas)")
@@ -108,7 +112,8 @@ def fig_practica_compra(origen, salida, instancias=None):
         ax.set_xticklabels(["a: 658/ha", "b: 524/ha", "c: ε=0", "d: ε=0.1"])
         ax.set_ylabel(etq)
         if col == "costo_ha":
-            ax.axhline(12500, color="red", ls="--", label="presupuesto 12,500")
+            ax.axhline(leer_config()["presupuesto_ha"], color="red", ls="--",
+                       label=f"presupuesto {leer_config()['presupuesto_ha']:,.0f}")
         if col == "supervivencia":
             ax.set_ylim(0.9, 0.93)
     axs[0].legend(fontsize=8)

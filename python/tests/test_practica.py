@@ -48,3 +48,13 @@ def test_main_escribe_csv(tmp_path):
     main_compra(resultados=tmp_path, instancias=["1ha"], origen=RAIZ / "results")
     df = pd.read_csv(tmp_path / "practica_compra.csv")
     assert sorted(df["opcion"]) == ["a", "b", "c", "d"]
+
+
+def test_practica_compra_lee_parametros_de_config(monkeypatch):
+    import practica_compra
+    import figuras
+    from comun import leer_config
+    cfg = leer_config()
+    assert practica_compra.parametros()["presupuesto_ha"] == cfg["presupuesto_ha"]
+    assert practica_compra.parametros()["pi_factor"] == cfg["pi_factor"]
+    assert figuras.gamma_estrella() == cfg["gamma_star"]

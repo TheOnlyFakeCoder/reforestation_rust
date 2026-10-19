@@ -10,9 +10,15 @@ except ImportError:
     from python.comun import RAIZ, leer_config, leer_especies
 
 J = 10
-PRESUPUESTO_HA = 12500.0
 NOMBRES = {"a": "nominal 658/ha", "b": "nominal 524/ha",
            "c": "paso 2 (eps=0)", "d": "paso 2 (eps=0.1)"}
+
+
+def parametros():
+    """Presupuesto por hectárea y factor π leídos de config/default.json."""
+    cfg = leer_config()
+    return {"presupuesto_ha": float(cfg["presupuesto_ha"]), "pi_factor": float(cfg["pi_factor"]),
+            "epsilon": float(cfg["epsilon"])}
 
 
 def mayor_residuo(total, pesos, suma_pesos):
@@ -54,7 +60,8 @@ def main(resultados=None, instancias=None, origen=None):
     s1 = pd.read_csv(RAIZ / "data" / "supervivencia.csv")["s1"].to_numpy(dtype=float)
     comp = pd.read_csv(origen / "paso1_composicion.csv").set_index("instancia")
     p2 = pd.read_csv(origen / "paso2_compra.csv")
-    p2 = p2[p2["pi_factor"] == 2]
+    par = parametros()
+    p2 = p2[np.isclose(p2["pi_factor"], par["pi_factor"])]
     if instancias is None:
         instancias = [i for i in comp.index if (origen / f"escenarios_X_{i}.csv").exists()]
     filas = []
@@ -65,10 +72,10 @@ def main(resultados=None, instancias=None, origen=None):
         Dnom = f[[f"Dnom_{j}" for j in range(J)]].to_numpy(dtype=float)
         X = pd.read_csv(origen / f"escenarios_X_{inst}.csv")[[f"X_{j}" for j in range(J)]]
         X = X.to_numpy(dtype=float)
-        B = PRESUPUESTO_HA * area
+        B = par["presupuesto_ha"] * area
         opciones = {"a": (Dnom, Dnom),
                     "b": (mayor_residuo(round(524 * area), delta, 658), Dnom)}
-        for op, eps in (("c", 0.0), ("d", 0.1)):
+        for op, eps in (("c", 0.0), ("d", par["epsilon"])):
             r = p2[(p2["instancia"] == inst) & (np.isclose(p2["epsilon"], eps))]
             if len(r):
                 q = r.iloc[0][[f"q_{j}" for j in range(J)]].to_numpy(dtype=float)

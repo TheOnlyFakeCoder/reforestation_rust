@@ -16,11 +16,11 @@
   "pi_factor": 2.0,
   "tabu": {
     "candidatos": 128,
-    "tenure": 25,
+    "tenure": 10,
     "max_iter": 20000,
     "max_sin_mejora": 3000,
     "prob_intercambio": 0.5,
-    "iter_por_posicion": 100,
-    "sin_mejora_por_posicion": 4
+    "iter_por_posicion": 300,
+    "sin_mejora_por_posicion": 8
   }
 }

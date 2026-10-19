@@ -62,13 +62,13 @@ pub struct ConfigTabu {
 impl Default for ConfigTabu {
     fn default() -> Self {
         ConfigTabu {
-            candidatos: 64,
-            tenure: 15,
+            candidatos: 128,
+            tenure: 10,
             max_iter: 20_000,
             max_sin_mejora: 3_000,
             prob_intercambio: 0.5,
-            iter_por_posicion: 50,
-            sin_mejora_por_posicion: 0,
+            iter_por_posicion: 300,
+            sin_mejora_por_posicion: 8,
         }
     }
 }
@@ -428,21 +428,24 @@ mod tests {
 
     #[test]
     fn params_para_escala_el_tope_con_el_numero_de_posiciones() {
-        let t = ConfigTabu::default();
-        assert_eq!((t.iter_por_posicion, t.sin_mejora_por_posicion), (50, 0));
+        let t = ConfigTabu {
+            iter_por_posicion: 50,
+            sin_mejora_por_posicion: 0,
+            ..ConfigTabu::default()
+        };
         assert_eq!(t.params_para(1, 1000).max_iter, 50_000);
         // n = 100: max(20 000, 5 000) = 20 000.
         assert_eq!(t.params_para(1, 100).max_iter, 20_000);
         assert_eq!(t.params_para(7, 100).semilla, 7);
         assert_eq!(t.params_para(1, 100).max_sin_mejora, 3_000);
-        let t = ConfigTabu {
+        let t2 = ConfigTabu {
             sin_mejora_por_posicion: 2,
-            ..ConfigTabu::default()
+            ..t.clone()
         };
-        assert_eq!(t.params_para(1, 5000).max_sin_mejora, 10_000);
-        assert_eq!(t.params_para(1, 100).max_sin_mejora, 3_000);
+        assert_eq!(t2.params_para(1, 5000).max_sin_mejora, 10_000);
+        assert_eq!(t2.params_para(1, 100).max_sin_mejora, 3_000);
         // params (legacy) no escala.
-        assert_eq!(ConfigTabu::default().params(1).max_iter, 20_000);
+        assert_eq!(t.params(1).max_iter, 20_000);
     }
 
     #[test]

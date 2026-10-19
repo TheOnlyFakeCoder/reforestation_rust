@@ -8,6 +8,9 @@
 //!   practica  práctica actual (serpentina) contra el tabú [--instancias …|todas]
 //!   calibrar  rejilla K x tenure del tabú [--instancias …] [--candidatos …] [--tenures …] [--semillas N]
 //!   paso1  barrido de γ y patrón base [--instancias 1ha,map_27|todas] [--solo-gamma-star]
+//!   instancias-val  escribe `validacion/inst_<id>.json` (10 instancias de validación exacta)
+//!   tabu-val  tabú sobre cada `validacion/inst_*.json` → `tabu_<id>.csv` [--semillas 10]
+//!   evaluar-val  z y objetivo de asignaciones: --inst JSON --phi CSV
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -29,6 +32,10 @@ use reforestation::reportes::{
     escribir_w, resumen_malla,
 };
 use reforestation::tabu::DEFAULT_ROW_SEQUENCE;
+use reforestation::validacion::{
+    coincide, construir, correr_tabu, evaluar, leer_asignaciones, phi_a_texto, red, violaciones,
+    InstanciaVal, ESPECIFICACIONES,
+};
 
 /// Configuración compartida con Python; si no existe se usan los valores por defecto.
 const CONFIG_POR_DEFECTO: &str = "config/default.json";
@@ -56,7 +63,7 @@ fn opcion(args: &[String], nombre: &str, por_defecto: &str) -> Result<String, St
     }
 }
 
-const OPCIONES: [&str; 9] = [
+const OPCIONES: [&str; 11] = [
     "--datos",
     "--resultados",
     "--config",
@@ -66,6 +73,8 @@ const OPCIONES: [&str; 9] = [
     "--candidatos",
     "--tenures",
     "--semillas",
+    "--inst",
+    "--phi",
 ];
 /// Opciones sin valor.
 const BANDERAS: [&str; 1] = ["--solo-gamma-star"];
@@ -183,6 +192,28 @@ fn ejecutar(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
                 &tenures,
                 n_semillas,
             )
+        }
+        Some("instancias-val") => {
+            let config = cargar_config(args)?;
+            instancias_val(Path::new(&datos_dir), Path::new(&resultados_dir), &config)
+        }
+        Some("tabu-val") => {
+            let config = cargar_config(args)?;
+            let n_semillas: u64 = opcion(args, "--semillas", "10")?.parse()?;
+            tabu_val(
+                Path::new(&datos_dir),
+                Path::new(&resultados_dir),
+                &config,
+                n_semillas,
+            )
+        }
+        Some("evaluar-val") => {
+            let inst = opcion(args, "--inst", "")?;
+            let phi = opcion(args, "--phi", "")?;
+            if inst.is_empty() || phi.is_empty() {
+                return Err("evaluar-val requiere --inst JSON y --phi CSV".into());
+            }
+            evaluar_val(Path::new(&inst), Path::new(&phi))
         }
         otro => Err(format!("subcomando desconocido: {}", otro.unwrap_or("")).into()),
     }
@@ -913,5 +944,133 @@ fn practica(
     }
     csv.flush()?;
     println!("practica: {:.1} s", inicio.elapsed().as_secs_f64());
+    Ok(())
+}
+
+/// Escribe las 10 instancias de validación en `resultados/validacion/inst_<id>.json`.
+fn instancias_val(
+    datos_dir: &Path,
+    resultados_dir: &Path,
+    config: &Config,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let datos = Datos::cargar(datos_dir)?;
+    let mc = ParamsMc::leer(&resultados_dir.join("mc_params.json"))?;
+    let dir = resultados_dir.join("validacion");
+    std::fs::create_dir_all(&dir)?;
+    for e in &ESPECIFICACIONES {
+        let inst = construir(e, &datos, config, &mc);
+        std::fs::write(
+            dir.join(format!("inst_{}.json", inst.id)),
+            serde_json::to_string(&inst)?,
+        )?;
+        let fijas = inst.fija.iter().filter(|&&f| f >= 0).count();
+        println!(
+            "{}: |V| = {}, fijas = {fijas}, M = {:?}, D_tot = {:?}, aristas = {}",
+            inst.id,
+            inst.n_pos,
+            inst.m,
+            inst.d_tot,
+            inst.aristas.len()
+        );
+    }
+    Ok(())
+}
+
+/// Tabú con semillas `semilla + k` sobre cada `validacion/inst_*.json` → `tabu_<id>.csv`.
+fn tabu_val(
+    datos_dir: &Path,
+    resultados_dir: &Path,
+    config: &Config,
+    n_semillas: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let datos = Datos::cargar(datos_dir)?;
+    let dir = resultados_dir.join("validacion");
+    let mut archivos: Vec<std::path::PathBuf> = std::fs::read_dir(&dir)
+        .map_err(|e| format!("{}: {e}", dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("inst_") && n.ends_with(".json"))
+        })
+        .collect();
+    archivos.sort();
+    if archivos.is_empty() {
+        return Err(format!("{}: sin inst_*.json (correr instancias-val)", dir.display()).into());
+    }
+    for path in archivos {
+        let inst: InstanciaVal = serde_json::from_str(&std::fs::read_to_string(&path)?)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        if inst.disposicion != "Completa" {
+            return Err(format!("{}: sólo se admiten mallas Completa", path.display()).into());
+        }
+        let r = red(inst.columnas, inst.filas, &datos, config);
+        if !coincide(&inst, &r) {
+            return Err(format!(
+                "{}: aristas o pesos distintos a los de la configuración actual",
+                path.display()
+            )
+            .into());
+        }
+        let mut csv = csv::Writer::from_path(dir.join(format!("tabu_{}.csv", inst.id)))?;
+        csv.write_record([
+            "semilla",
+            "z",
+            "objetivo",
+            "tiempo_s",
+            "iteraciones",
+            "motivo_paro",
+            "phi",
+        ])?;
+        let mut zs = Vec::new();
+        for k in 0..n_semillas {
+            let c = correr_tabu(&inst, &r, &config.tabu, config.semilla + k);
+            let fallas = violaciones(&inst, &c.phi);
+            if !fallas.is_empty() {
+                return Err(format!("{} semilla {}: {fallas:?}", inst.id, c.semilla).into());
+            }
+            csv.write_record([
+                c.semilla.to_string(),
+                c.z.to_string(),
+                c.objetivo.to_string(),
+                c.tiempo_s.to_string(),
+                c.iteraciones.to_string(),
+                c.motivo_paro.como_str().to_string(),
+                phi_a_texto(&c.phi),
+            ])?;
+            zs.push(c.z);
+        }
+        csv.flush()?;
+        let mejor = zs.iter().copied().fold(f64::INFINITY, f64::min);
+        let (media, _) = estadisticos(&zs);
+        println!("{}: z mejor {mejor:.6}, media {media:.6}", inst.id);
+    }
+    Ok(())
+}
+
+/// Imprime `z,objetivo` (12 decimales) de cada asignación del CSV; avisa en stderr si alguna
+/// viola las restricciones de la instancia.
+fn evaluar_val(inst: &Path, phi: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let inst: InstanciaVal = serde_json::from_str(
+        &std::fs::read_to_string(inst).map_err(|e| format!("{}: {e}", inst.display()))?,
+    )
+    .map_err(|e| format!("{}: {e}", inst.display()))?;
+    let asignaciones = leer_asignaciones(phi)?;
+    println!("z,objetivo");
+    for (k, phi) in asignaciones.iter().enumerate() {
+        if phi.len() != inst.n_pos {
+            return Err(format!(
+                "asignación {k}: {} posiciones, la instancia tiene {}",
+                phi.len(),
+                inst.n_pos
+            )
+            .into());
+        }
+        for falla in violaciones(&inst, phi) {
+            eprintln!("aviso: asignación {k}: {falla}");
+        }
+        let (z, objetivo) = evaluar(&inst, phi);
+        println!("{z:.12},{objetivo:.12}");
+    }
     Ok(())
 }

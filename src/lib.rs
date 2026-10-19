@@ -24,6 +24,7 @@ pub mod reforestation;
 pub mod reportes;
 pub mod tabu;
 pub mod terrain;
+pub mod validacion;
 pub mod writer;
 
 pub use reforestation::{Plant, Polygon, Wasted};

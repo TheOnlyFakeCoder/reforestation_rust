@@ -154,9 +154,10 @@ def fig_mapa(inst, origen, salida):
     asas = [plt.Line2D([], [], marker="o", ls="", color=cmap(j), label=nombres[j]) for j in range(J)]
     asas += [plt.Line2D([], [], marker="o", ls="", mfc="#999999", mec="black", mew=1.6, label="existente"),
              plt.Line2D([], [], marker="o", ls="", mfc="none", mec="#bbbbbb", label="vacía")]
-    fig.legend(handles=asas, loc="lower center", ncol=6, fontsize=9, frameon=False)
-    fig.suptitle(f"Distribución de especies en {inst}")
-    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.suptitle(f"Distribución de especies en {inst}", fontsize=14)
+    fig.tight_layout(rect=(0, 0.12, 1, 0.95))
+    fig.legend(handles=asas, loc="lower center", ncol=6, fontsize=9, frameon=False,
+               bbox_to_anchor=(0.5, 0.0))
     Path(salida).mkdir(parents=True, exist_ok=True)
     fig.savefig(Path(salida) / f"mapa_{inst}.png", dpi=300)
     plt.close(fig)

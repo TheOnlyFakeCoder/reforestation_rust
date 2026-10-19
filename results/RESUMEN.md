@@ -421,11 +421,11 @@ Compra (a nominal 658/ha, b nominal 524/ha, c paso 2 ε = 0, d paso 2 ε = 0.1):
 | 1ha | 1 | a | nominal 658/ha | 658 | 15473 | False | 0 | 129.467 | 0.9147 | 483.4413 |
 | 1ha | 1 | b | nominal 524/ha | 524 | 12324.5 | True | 15.638 | 11.105 | 0.9149 | 469.2484 |
 | 1ha | 1 | c | paso 2 (eps=0) | 530 | 12473 | True | 12.264 | 13.731 | 0.9148 | 472.2903 |
-| 1ha | 1 | d | paso 2 (eps=0.1) | 530 | 12422 | True | 12.264 | 13.731 | 0.9139 | 471.8365 |
+| 1ha | 1 | d | paso 2 (eps=0.1) | 530 | 12422 | True | 12.264 | 13.731 | 0.9141 | 471.9109 |
 | map_27 | 1.28 | a | nominal 658/ha | 842 | 15471.0938 | False | 0 | 165.332 | 0.9147 | 618.9554 |
 | map_27 | 1.28 | b | nominal 524/ha | 671 | 12330.4688 | True | 17.974 | 12.306 | 0.9149 | 602.6338 |
 | map_27 | 1.28 | c | paso 2 (eps=0) | 678 | 12470.7031 | True | 13.805 | 15.137 | 0.9148 | 606.4054 |
-| map_27 | 1.28 | d | paso 2 (eps=0.1) | 678 | 12415.625 | True | 13.805 | 15.137 | 0.9137 | 605.6788 |
+| map_27 | 1.28 | d | paso 2 (eps=0.1) | 678 | 12415.625 | True | 13.805 | 15.137 | 0.9138 | 605.7462 |
 
 Distribución. `Z_por_planta` divide entre las plantas presentes (T + M), que en las variantes con existentes son menos que D_tot; por eso se añaden Z/D_tot y Z/ha (D_tot y el área vienen de `malla_resumen.csv`):
 

@@ -46,7 +46,7 @@ $py = ".venv\Scripts\python.exe"
 & $reto montecarlo --instancias todas
 & $py python\paso2_compra.py
 & $reto paso3 --instancias todas
-& $reto practica
+& $reto practica --instancias todas
 & $py python\practica_compra.py
 & $py python\markov.py
 & $py python\figuras.py

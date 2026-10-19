@@ -45,3 +45,24 @@ def test_brechas_paso3_valores():
     assert abs(b.loc["1ha", "huecos_por_ha"] - 12.2) < 0.1
     assert (b["huecos_por_ha"] > 4).all() and (b["huecos_por_ha"] < 13).all()
     assert np.allclose(b["faltante_compra"] + b["excedente_malla"], b["huecos"], atol=0.5)
+
+
+def test_resumen_convergencia_y_calibracion(tmp_path):
+    texto = resumen.main(origen=RAIZ / "results", salida=tmp_path / "R.md").read_text(encoding="utf-8")
+    for titulo in ["## Convergencia del tabú", "### Motivos de paro", "### Corrida de referencia",
+                   "### Calibración de K y tenure", "### Parámetros finales del tabú"]:
+        assert titulo in texto, titulo
+    assert "| total | 3382 | 0 | 3382 | 1 |" in texto
+    assert "0.604" in texto and "iter_por_posicion" in texto and "300" in texto
+    assert "z_opt_sd" in texto
+    assert "una semilla por escenario" in texto
+    assert "convergencia_map_21.png" in texto
+    assert "Curvas de convergencia de un polígono de 8 ha" not in texto
+    assert "calibración" not in texto.split("## No incluido / pendiente")[1].split("## Figuras")[0].lower()
+    assert "CP-SAT" in texto
+
+
+def test_calibracion_eleccion_regla():
+    c = pd.read_csv(RAIZ / "results" / "calibracion_tabu.csv")
+    k, t = resumen.eleccion_calibracion(c)
+    assert (k, t) == (128, 10)

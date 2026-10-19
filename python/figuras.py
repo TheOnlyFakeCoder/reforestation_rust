@@ -18,6 +18,8 @@ except ImportError:
 J = 10
 INSTANCIAS = ["1ha", "map_27"]
 FIGURAS = {}
+# Instancias adicionales sólo para algunas figuras (se suman a INSTANCIAS si no se pasa --instancias).
+INSTANCIAS_EXTRA = {"convergencia": ["map_21"]}
 
 
 def gamma_estrella():
@@ -213,7 +215,7 @@ def main(nombres=None, instancias=None, origen=None, salida=None):
     for n in nombres or list(FIGURAS):
         f, por_inst = FIGURAS[n]
         if por_inst:
-            for inst in instancias or INSTANCIAS:
+            for inst in instancias or INSTANCIAS + INSTANCIAS_EXTRA.get(n, []):
                 f(inst, origen, salida)
         else:
             f(origen, salida, instancias)

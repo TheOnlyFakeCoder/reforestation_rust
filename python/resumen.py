@@ -20,6 +20,7 @@ FIGURAS_LISTA = [
     ("curva_compromiso_map_27.png", "Curva de compromiso competencia vs. costo, P1"),
     ("convergencia_1ha.png", "Convergencia del tabú del paso 1, 1 ha"),
     ("convergencia_map_27.png", "Convergencia del tabú del paso 1, P1"),
+    ("convergencia_map_21.png", "Convergencia del tabú del paso 1, map_21 (mayor |V|)"),
     ("mapa_1ha.png", "Mapa socia vs. tabú (paso 3, ω = 0), 1 ha"),
     ("mapa_map_27.png", "Mapa socia vs. tabú (paso 3, ω = 0), P1"),
     ("practica_compra.png", "Práctica actual vs. modelo: compra de plantas"),
@@ -85,7 +86,7 @@ def _paso1(o, gamma_star):
     partes = [f"γ* = {gamma_star:g}, elegido por el usuario en el codo de la curva de compromiso."]
     for inst in INSTANCIAS:
         s = g[g["instancia"] == inst][["gamma", "suma_theta_d", "suma_c_d", "z_opt_media", "z_opt_min",
-                                       "z_opt_max", "z_opt_por_planta_media"]]
+                                       "z_opt_max", "z_opt_sd", "z_opt_por_planta_media"]]
         partes.append(f"Barrido de γ, {inst}:\n\n" + tabla_md(s))
     c = _csv(o, "paso1_composicion.csv")
     cols = ["instancia", "d_tot"] + [f"D_{j}" for j in range(10)]
@@ -169,7 +170,9 @@ def _paso3(o):
             "faltante_esperado_paso2", "excedente_malla", "holgura_presupuesto"]
     return (nota + "\n\nHuecos de paso 3 (1 ha y P1):\n\n" + tabla_md(sel[cols])
             + "\n\nHuecos de paso 3 (todas las instancias):\n\n" + tabla_md(b[cols])
-            + "\n\nResumen del paso 3:\n\n" + tabla_md(r.drop(columns=["map_id"])))
+            + "\n\nResumen del paso 3. `Z_sd` es la desviación sobre escenarios (una semilla por "
+            "escenario), no sobre semillas de una misma instancia:\n\n"
+            + tabla_md(r.drop(columns=["map_id"])))
 
 
 def _practica(o):
@@ -203,13 +206,73 @@ def _practica(o):
             + tabla_md(mk))
 
 
+def eleccion_calibracion(c):
+    """Regla de elección de (K, tenure): menor promedio de z_rel entre instancias; si otra
+    combinación queda a <= 0.001 y es más rápida (tiempo medio promedio), se elige la más rápida."""
+    c = c.assign(z_rel=c["z_opt_media"] / c.groupby("instancia")["z_opt_media"].transform("min"))
+    g = c.groupby(["candidatos", "tenure"]).agg(z_rel=("z_rel", "mean"),
+                                                tiempo=("tiempo_medio_s", "mean")).reset_index()
+    mejor = g.loc[g["z_rel"].idxmin()]
+    cerca = g[(g["z_rel"] <= mejor["z_rel"] + 0.001) & (g["tiempo"] < mejor["tiempo"])]
+    if len(cerca):
+        mejor = cerca.loc[cerca["tiempo"].idxmin()]
+    return int(mejor["candidatos"]), int(mejor["tenure"])
+
+
+def _convergencia(o, cfg):
+    t = cfg["tabu"]
+    crit = _csv(o, "convergencia_criterio.csv")
+    ref = _csv(o, "convergencia_referencia.csv")
+    cal = _csv(o, "calibracion_tabu.csv")
+    tot = crit[crit["instancia"] == "total"].iloc[0]
+    por = crit[crit["instancia"] != "total"]
+    cal = cal.assign(z_rel=cal["z_opt_media"] / cal.groupby("instancia")["z_opt_media"].transform("min"))
+    k, ten = eleccion_calibracion(cal.drop(columns="z_rel"))
+    prom = cal.groupby(["candidatos", "tenure"], as_index=False).agg(
+        z_rel_prom=("z_rel", "mean"), tiempo_prom_s=("tiempo_medio_s", "mean"))
+    cols = ["instancia", "candidatos", "tenure", "n_semillas", "z_opt_media", "z_opt_sd", "z_rel",
+            "tiempo_medio_s", "iter_media", "frac_sin_mejora"]
+    fin = ref[ref["corrida"] == "final"].set_index("instancia")
+    dr = ", ".join(f"{i}: {100 * r['dif_rel']:.3f} %" for i, r in fin.iterrows())
+    intro = (
+        f"Tope escalado por tamaño de la malla: max_iter_efectivo = max(max_iter, "
+        f"iter_por_posicion·|V|) y max_sin_mejora_efectivo = max(max_sin_mejora, "
+        f"sin_mejora_por_posicion·|V|). Criterio: al menos 90 % de las búsquedas tabú terminan por "
+        f"`sin_mejora` en total y 80 % en cada instancia. Se cumple: {tot['paros_sin_mejora']:.0f} de "
+        f"{tot['busquedas']:.0f} búsquedas ({100 * tot['frac_sin_mejora']:.1f} %) y el mínimo por instancia es "
+        f"{100 * por['frac_sin_mejora'].min():.1f} %.")
+    refp = (
+        "La corrida de referencia usa topes 10 veces mayores (iter_por_posicion = 3000); "
+        "`dif_rel` es la diferencia relativa de z_opt_media de la corrida final contra la referencia "
+        f"(criterio: <= 0.5 %): {dr}. Con topes 100/4 (iter_por_posicion / sin_mejora_por_posicion) "
+        "map_21 no pasó esta verificación (0.604 % > 0.5 %); el usuario eligió subir los topes a 300/8, "
+        "con lo que se cumplen el criterio de paro y la referencia.")
+    calp = (
+        "Calibración con γ = γ* = 3 en 1 ha y map_21, 5 semillas por combinación. z_rel es "
+        "z_opt_media entre el mínimo de la rejilla en esa instancia. Regla: menor promedio de z_rel "
+        "entre las dos instancias; si otra combinación queda a <= 0.001 de ese promedio y es más "
+        f"rápida, se elige la más rápida. Resultado: K = {k}, tenure = {ten}.")
+    par = pd.DataFrame({"parámetro": ["candidatos", "tenure", "max_iter", "max_sin_mejora",
+                                      "iter_por_posicion", "sin_mejora_por_posicion"],
+                        "valor": [t["candidatos"], t["tenure"], t["max_iter"], t["max_sin_mejora"],
+                                  t["iter_por_posicion"], t["sin_mejora_por_posicion"]]})
+    return "\n\n".join([
+        intro,
+        "### Motivos de paro\n\nPor instancia, sobre todas las búsquedas del pipeline:\n\n"
+        + tabla_md(crit),
+        "### Corrida de referencia\n\n" + refp + "\n\n" + tabla_md(ref),
+        "### Calibración de K y tenure\n\n" + calp + "\n\n" + tabla_md(cal[cols])
+        + "\n\nPromedio entre instancias:\n\n" + tabla_md(prom),
+        "### Parámetros finales del tabú\n\nLeídos de `config/default.json`:\n\n" + tabla_md(par),
+    ])
+
+
 def _pendiente():
     return ("Lo siguiente de la especificación no se hizo y no tiene salida en `results/`:\n\n"
             "- Validación exacta con CP-SAT (§9).\n"
             "- Comparación con DSATUR (§10).\n"
             "- Sensibilidades: κ = 0.4 y 0.8, radios × 0.75 y × 1.25, m × 0, 0.5 y 2, y s2.\n"
-            "- Curvas de convergencia de un polígono de 8 ha: los CSV existen "
-            "(`convergencia_map_*.csv`), pero sólo se grafican 1 ha y P1.")
+            "")
 
 
 def _notas():
@@ -238,6 +301,7 @@ def generar(origen):
         "## Paso 2: compra\n\n" + _paso2(origen, cfg),
         "## Paso 3: ajuste al polígono real\n\n" + _paso3(origen),
         "## Práctica actual\n\n" + _practica(origen),
+        "## Convergencia del tabú\n\n" + _convergencia(origen, cfg),
         "## Notas de interpretación\n\n" + _notas(),
         "## No incluido / pendiente\n\n" + _pendiente(),
         "## Figuras\n\n" + _figuras(),

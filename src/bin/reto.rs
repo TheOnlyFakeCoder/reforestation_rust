@@ -6,12 +6,14 @@
 //!   montecarlo  escenarios de existentes y resúmenes de C y costo [--instancias …|todas]
 //!   paso3  ajuste al polígono real por escenario [--instancias …|todas] [--compra CSV]
 //!   practica  práctica actual (serpentina) contra el tabú [--instancias …|todas]
+//!   calibrar  rejilla K x tenure del tabú [--instancias …] [--candidatos …] [--tenures …] [--semillas N]
 //!   paso1  barrido de γ y patrón base [--instancias 1ha,map_27|todas] [--solo-gamma-star]
 
 use std::path::Path;
 use std::process::ExitCode;
 
 use reforestation::busqueda_tabu::MotivoParo;
+use reforestation::calibracion::{calibrar, elegir};
 use reforestation::competencia::matriz_w;
 use reforestation::config::Config;
 use reforestation::datos::{Datos, N_ESPECIES};
@@ -54,13 +56,16 @@ fn opcion(args: &[String], nombre: &str, por_defecto: &str) -> Result<String, St
     }
 }
 
-const OPCIONES: [&str; 6] = [
+const OPCIONES: [&str; 9] = [
     "--datos",
     "--resultados",
     "--config",
     "--set",
     "--instancias",
     "--compra",
+    "--candidatos",
+    "--tenures",
+    "--semillas",
 ];
 /// Opciones sin valor.
 const BANDERAS: [&str; 1] = ["--solo-gamma-star"];
@@ -163,8 +168,108 @@ fn ejecutar(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
                 &instancias,
             )
         }
+        Some("calibrar") => {
+            let config = cargar_config(args)?;
+            let instancias = opcion(args, "--instancias", "1ha,map_21")?;
+            let candidatos = lista_usize(&opcion(args, "--candidatos", "32,64,128")?)?;
+            let tenures = lista_usize(&opcion(args, "--tenures", "10,15,25")?)?;
+            let n_semillas: u64 = opcion(args, "--semillas", "5")?.parse()?;
+            calibrar_cli(
+                Path::new(&datos_dir),
+                Path::new(&resultados_dir),
+                &config,
+                &instancias,
+                &candidatos,
+                &tenures,
+                n_semillas,
+            )
+        }
         otro => Err(format!("subcomando desconocido: {}", otro.unwrap_or("")).into()),
     }
+}
+
+fn lista_usize(texto: &str) -> Result<Vec<usize>, Box<dyn std::error::Error>> {
+    let valores = texto
+        .split(',')
+        .map(|v| v.trim().parse::<usize>())
+        .collect::<Result<Vec<_>, _>>()?;
+    if valores.is_empty() {
+        return Err("lista vacía".into());
+    }
+    Ok(valores)
+}
+
+/// Rejilla K x tenure sobre cada instancia con γ*; escribe `calibracion_tabu.csv`.
+fn calibrar_cli(
+    datos_dir: &Path,
+    resultados_dir: &Path,
+    config: &Config,
+    instancias: &str,
+    candidatos: &[usize],
+    tenures: &[usize],
+    n_semillas: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let datos = Datos::cargar(datos_dir)?;
+    std::fs::create_dir_all(resultados_dir)?;
+    let pedidas = resolver_instancias(&datos, instancias)?;
+    let semillas: Vec<u64> = (0..n_semillas).map(|k| config.semilla + k).collect();
+    let mut csv = csv::Writer::from_path(resultados_dir.join("calibracion_tabu.csv"))?;
+    csv.write_record([
+        "instancia",
+        "candidatos",
+        "tenure",
+        "n_semillas",
+        "z_opt_media",
+        "z_opt_sd",
+        "z_opt_mejor",
+        "objetivo_media",
+        "tiempo_medio_s",
+        "iter_media",
+        "frac_sin_mejora",
+    ])?;
+    let mut todas = Vec::new();
+    for (nombre, area) in &pedidas {
+        let instancia = Instancia::nueva(
+            nombre,
+            *area,
+            &datos,
+            config,
+            config.m_escala,
+            config.usar_s2,
+        );
+        let filas = calibrar(
+            &instancia,
+            config.gamma_star,
+            &config.tabu,
+            candidatos,
+            tenures,
+            &semillas,
+        );
+        for f in &filas {
+            csv.write_record([
+                f.instancia.clone(),
+                f.candidatos.to_string(),
+                f.tenure.to_string(),
+                f.n_semillas.to_string(),
+                f.z_opt_media.to_string(),
+                f.z_opt_sd.to_string(),
+                f.z_opt_mejor.to_string(),
+                f.objetivo_media.to_string(),
+                f.tiempo_medio_s.to_string(),
+                f.iter_media.to_string(),
+                f.frac_sin_mejora.to_string(),
+            ])?;
+            println!(
+                "{nombre}: K = {}, tenure = {}: Z_opt = {:.2} ± {:.2}, {:.1} s",
+                f.candidatos, f.tenure, f.z_opt_media, f.z_opt_sd, f.tiempo_medio_s
+            );
+        }
+        todas.extend(filas);
+    }
+    csv.flush()?;
+    let (k, tenure) = elegir(&todas);
+    println!("combinación elegida: K = {k}, tenure = {tenure}");
+    Ok(())
 }
 
 fn malla(

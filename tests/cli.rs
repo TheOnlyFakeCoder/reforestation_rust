@@ -541,3 +541,42 @@ fn paso3_y_practica_escriben_el_motivo_de_paro() {
         }
     }
 }
+
+#[test]
+fn calibrar_escribe_el_csv_con_el_encabezado_exacto() {
+    let datos = dir_temporal("calibrar_datos");
+    let resultados = dir_temporal("calibrar_resultados");
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
+    let salida = reto(&[
+        "calibrar",
+        "--datos",
+        datos.to_str().unwrap(),
+        "--resultados",
+        resultados.to_str().unwrap(),
+        "--instancias",
+        "1ha",
+        "--candidatos",
+        "16,24",
+        "--tenures",
+        "5",
+        "--semillas",
+        "2",
+        "--set",
+        TABU_CORTO,
+    ]);
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
+    assert_eq!(
+        encabezado_de(&resultados, "calibracion_tabu.csv"),
+        "instancia,candidatos,tenure,n_semillas,z_opt_media,z_opt_sd,z_opt_mejor,\
+         objetivo_media,tiempo_medio_s,iter_media,frac_sin_mejora"
+    );
+    let texto = std::fs::read_to_string(resultados.join("calibracion_tabu.csv")).unwrap();
+    assert_eq!(texto.lines().count(), 3);
+    assert!(String::from_utf8_lossy(&salida.stdout).contains("elegida"));
+}

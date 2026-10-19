@@ -19,6 +19,8 @@
     "tenure": 15,
     "max_iter": 20000,
     "max_sin_mejora": 3000,
-    "prob_intercambio": 0.5
+    "prob_intercambio": 0.5,
+    "iter_por_posicion": 50,
+    "sin_mejora_por_posicion": 0
   }
 }

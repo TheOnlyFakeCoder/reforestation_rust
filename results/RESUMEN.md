@@ -330,7 +330,56 @@ Comparación de π (1 ha y P1):
 
 ## Paso 3: ajuste al polígono real
 
-Los escenarios caen en `presupuesto_corto` en 3100 de 3100 casos: con q cercano a la mediana (π = 2c) la compra deja unas 12 posiciones vacías por hectárea. Es un hallazgo del modelo, no un error.
+Los escenarios caen en `presupuesto_corto` en 3100 de 3100 casos. El nombre es el de la especificación para Σn < |V_lib|; aquí no lo causa el presupuesto. Con π = 2c la razón crítica es 0.5, así que el modelo compra cerca de la mediana de C, y además la malla tiene posiciones de más (|V| > D_tot). Como el caso `usual` exige Σn = |V_lib|, no se alcanza si algún q_j < C_j o si |V| > D_tot.
+
+Huecos medios por hectárea, (V_lib − M)/A: entre 4.4 y 12.2 en las 31 instancias (12.2 en 1 ha, 10.6 en P1/map_27). Cada hueco se parte en faltante de compra (ΣC⁺ − M, que coincide con el `faltante_esperado` del paso 2 salvo por el número de escenarios: 100 aquí, 1000 allá) y excedente de malla (|V| − D_tot). El excedente de malla va de 0 a 8 posiciones.
+
+El presupuesto no es activo con π = 2: la compra cabe en todas las instancias, con una holgura B·A − costo de $78 a $898. Es un hallazgo del modelo, no un error.
+
+Huecos de paso 3 (1 ha y P1):
+
+| instancia | area_ha | huecos | huecos_por_ha | faltante_compra | faltante_esperado_paso2 | excedente_malla | holgura_presupuesto |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1ha | 1 | 12.17 | 12.17 | 12.17 | 12.264 | 0 | 78 |
+| map_27 | 1.28 | 13.54 | 10.5781 | 13.54 | 13.805 | 0 | 108 |
+
+Huecos de paso 3 (todas las instancias):
+
+| instancia | area_ha | huecos | huecos_por_ha | faltante_compra | faltante_esperado_paso2 | excedente_malla | holgura_presupuesto |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1ha | 1 | 12.17 | 12.17 | 12.17 | 12.264 | 0 | 78 |
+| map_27 | 1.28 | 13.54 | 10.5781 | 13.54 | 13.805 | 0 | 108 |
+| map_28 | 6.64 | 32.69 | 4.9232 | 31.69 | 33.384 | 1 | 724.5 |
+| map_30 | 6.76 | 36.15 | 5.3476 | 33.15 | 33.06 | 3 | 687 |
+| map_20 | 1.38 | 14.66 | 10.6232 | 14.66 | 14.868 | 0 | 150.5 |
+| map_21 | 8 | 35.29 | 4.4112 | 35.29 | 37.417 | 0 | 873 |
+| map_22 | 7.82 | 35.9 | 4.5908 | 35.9 | 37.348 | 0 | 898 |
+| map_23 | 5.53 | 32.48 | 5.8734 | 31.48 | 30.536 | 1 | 616.5 |
+| map_24 | 5.64 | 33.39 | 5.9202 | 32.39 | 31.07 | 1 | 616 |
+| map_18 | 7.11 | 35.52 | 4.9958 | 33.52 | 34.831 | 2 | 777.5 |
+| map_17 | 6.11 | 31.7 | 5.1882 | 31.7 | 32.368 | 0 | 663 |
+| map_16 | 5.64 | 33.1 | 5.8688 | 32.1 | 31.498 | 1 | 642.5 |
+| map_19 | 4.92 | 29.4 | 5.9756 | 26.4 | 27.546 | 3 | 475.5 |
+| map_25 | 5.05 | 30.11 | 5.9624 | 28.11 | 28.924 | 2 | 520 |
+| map_26 | 4.75 | 31.29 | 6.5874 | 30.29 | 28.604 | 1 | 533.5 |
+| map_13 | 7.97 | 39.99 | 5.0176 | 39.99 | 36.695 | 0 | 870.5 |
+| map_31 | 7.34 | 36.52 | 4.9755 | 36.52 | 36.7 | 0 | 810 |
+| map_14 | 5.98 | 34.03 | 5.6906 | 34.03 | 31.096 | 0 | 629 |
+| map_15 | 5.4 | 30.93 | 5.7278 | 29.93 | 30.22 | 1 | 558.5 |
+| map_7 | 6.28 | 41.57 | 6.6194 | 33.57 | 32.285 | 8 | 687 |
+| map_8 | 7.6 | 37.65 | 4.9539 | 37.65 | 35.88 | 0 | 832 |
+| map_9 | 8 | 39.55 | 4.9437 | 39.55 | 36.972 | 0 | 881.5 |
+| map_10 | 8 | 38.67 | 4.8338 | 38.67 | 37.312 | 0 | 870 |
+| map_11 | 7.67 | 44.26 | 5.7705 | 37.26 | 35.686 | 7 | 813 |
+| map_12 | 1.47 | 17.3 | 11.7687 | 15.3 | 15.323 | 2 | 143 |
+| map_6 | 4.19 | 27.89 | 6.6563 | 25.89 | 26.418 | 2 | 414 |
+| map_2 | 7.52 | 35.97 | 4.7832 | 33.97 | 35.255 | 2 | 778.5 |
+| map_3 | 8 | 37.47 | 4.6837 | 37.47 | 35.978 | 0 | 818 |
+| map_4 | 8 | 36.27 | 4.5338 | 36.27 | 36.682 | 0 | 847 |
+| map_5 | 7.56 | 38.17 | 5.0489 | 35.17 | 36.87 | 3 | 834.5 |
+| map_1 | 5.4 | 32.65 | 6.0463 | 31.65 | 30.807 | 1 | 602.5 |
+
+Resumen del paso 3:
 
 | instancia | n | Z_media | Z_sd | Z_p5 | Z_p50 | Z_p95 | casos_usual | casos_presupuesto_corto | casos_existentes_de_sobra |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -381,29 +430,47 @@ Compra (a nominal 658/ha, b nominal 524/ha, c paso 2 ε = 0, d paso 2 ε = 0.1):
 | map_27 | 1.28 | c | paso 2 (eps=0) | 678 | 12470.7031 | True | 13.805 | 15.137 | 0.9148 | 606.4054 |
 | map_27 | 1.28 | d | paso 2 (eps=0.1) | 678 | 12415.625 | True | 13.805 | 15.137 | 0.9137 | 605.6788 |
 
-Distribución:
+Distribución. `Z_por_planta` divide entre las plantas presentes (T + M), que en las variantes con existentes son menos que D_tot; por eso se añaden Z/D_tot y Z/ha (D_tot y el área vienen de `malla_resumen.csv`):
 
-| instancia | variante | plantas | Z | Z_por_planta | pares_inmediatos_misma_especie | Z_nivel1 | Z_nivel2 | Z_nivel3 | Z_nivel4 | Z_nivel5 | Z_otro |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1ha | i_serpentina | 658 | 749.4803 | 1.139 | 168 | 193.7051 | 216.1505 | 301.8658 | 5.8374 | 31.9215 | 0 |
-| 1ha | ii_serpentina_banda | 658 | 802.7557 | 1.22 | 226 | 250.7705 | 240.1468 | 275.9186 | 5.541 | 30.3788 | 0 |
-| 1ha | iii_serpentina_existentes | 644 | 773.8551 | 1.2016 | 206 | 248.903 | 210.6714 | 278.6455 | 5.0802 | 30.5551 | 0 |
-| 1ha | tabu_sin_existentes | 658 | 576.8748 | 0.8767 | 1 | 23.8359 | 183.8532 | 332.5623 | 5.1915 | 31.4319 | 0 |
-| 1ha | tabu_con_existentes | 644 | 568.6871 | 0.8831 | 18 | 43.9013 | 183.7801 | 305.5847 | 4.7529 | 30.6682 | 0 |
-| map_27 | i_serpentina | 842 | 1032.927 | 1.2268 | 281 | 347.8633 | 284.7679 | 356.2206 | 4.6789 | 39.3963 | 0 |
-| map_27 | ii_serpentina_banda | 842 | 1072.1232 | 1.2733 | 320 | 383.1487 | 312.2077 | 334.7965 | 3.984 | 37.9862 | 0 |
-| map_27 | iii_serpentina_existentes | 823 | 1000.2116 | 1.2153 | 279 | 331.9876 | 265.7493 | 358.8671 | 6.3883 | 37.2193 | 0 |
-| map_27 | tabu_sin_existentes | 842 | 744.0902 | 0.8837 | 0 | 28.9906 | 246.4891 | 421.1791 | 6.5799 | 40.8515 | 0 |
-| map_27 | tabu_con_existentes | 823 | 730.1822 | 0.8872 | 35 | 66.8663 | 233.7881 | 383.9149 | 6.3012 | 39.3117 | 0 |
+| instancia | variante | plantas | D_tot | Z | Z_por_planta | Z/D_tot | Z/ha | pares_inmediatos_misma_especie | Z_nivel1 | Z_nivel2 | Z_nivel3 | Z_nivel4 | Z_nivel5 | Z_otro |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1ha | i_serpentina | 658 | 658 | 749.4803 | 1.139 | 1.139 | 749.4803 | 168 | 193.7051 | 216.1505 | 301.8658 | 5.8374 | 31.9215 | 0 |
+| 1ha | ii_serpentina_banda | 658 | 658 | 802.7557 | 1.22 | 1.22 | 802.7557 | 226 | 250.7705 | 240.1468 | 275.9186 | 5.541 | 30.3788 | 0 |
+| 1ha | iii_serpentina_existentes | 644 | 658 | 773.8551 | 1.2016 | 1.1761 | 773.8551 | 206 | 248.903 | 210.6714 | 278.6455 | 5.0802 | 30.5551 | 0 |
+| 1ha | tabu_sin_existentes | 658 | 658 | 576.8748 | 0.8767 | 0.8767 | 576.8748 | 1 | 23.8359 | 183.8532 | 332.5623 | 5.1915 | 31.4319 | 0 |
+| 1ha | tabu_con_existentes | 644 | 658 | 568.6871 | 0.8831 | 0.8643 | 568.6871 | 18 | 43.9013 | 183.7801 | 305.5847 | 4.7529 | 30.6682 | 0 |
+| map_27 | i_serpentina | 842 | 842 | 1032.927 | 1.2268 | 1.2268 | 806.9742 | 281 | 347.8633 | 284.7679 | 356.2206 | 4.6789 | 39.3963 | 0 |
+| map_27 | ii_serpentina_banda | 842 | 842 | 1072.1232 | 1.2733 | 1.2733 | 837.5962 | 320 | 383.1487 | 312.2077 | 334.7965 | 3.984 | 37.9862 | 0 |
+| map_27 | iii_serpentina_existentes | 823 | 842 | 1000.2116 | 1.2153 | 1.1879 | 781.4153 | 279 | 331.9876 | 265.7493 | 358.8671 | 6.3883 | 37.2193 | 0 |
+| map_27 | tabu_sin_existentes | 842 | 842 | 744.0902 | 0.8837 | 0.8837 | 581.3204 | 0 | 28.9906 | 246.4891 | 421.1791 | 6.5799 | 40.8515 | 0 |
+| map_27 | tabu_con_existentes | 823 | 842 | 730.1822 | 0.8872 | 0.8672 | 570.4548 | 35 | 66.8663 | 233.7881 | 383.9149 | 6.3012 | 39.3117 | 0 |
 
-Markov (totales por instancia y composición):
+Markov. Titular: las filas `compra_d` (compra del paso 2, ε = 0.1) y `compra_nominal` (q = D̄) proyectan la supervivencia sobre las plantas realmente plantadas, E[min(q_j, C⁺_j)] sobre los escenarios. Las filas `D_completo` suponen plantar todo D sin plantas existentes, que ya sobrevivieron al establecimiento, y por eso sobrestiman las vivas y la reposición (entre 24 % y 28 % en la reposición de 1 ha). Las vivas a 1 año de `compra_d` en 1 ha coinciden con la opción d de `practica_compra.csv`.
 
-| instancia | composicion | plantas | vivas_1ano | vivas_2anos | reposicion_esperada |
-| --- | --- | --- | --- | --- | --- |
-| 1ha | D* | 658 | 601.4994 | 569.3122 | 95.3474 |
-| 1ha | Dnom | 658 | 601.9532 | 569.2745 | 95.2901 |
-| map_27 | D* | 842 | 769.562 | 728.338 | 122.2138 |
-| map_27 | Dnom | 842 | 770.2886 | 728.5032 | 121.8973 |
+| instancia | base | composicion | plantas | vivas_1ano | vivas_2anos | reposicion_esperada |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1ha | compra_d | D* | 516.269 | 471.8365 | 446.8145 | 74.7092 |
+| 1ha | compra_nominal | Dnom | 528.533 | 483.4413 | 457.2508 | 76.5748 |
+| 1ha | D_completo | D* | 658 | 601.4994 | 569.3122 | 95.3474 |
+| 1ha | D_completo | Dnom | 658 | 601.9532 | 569.2745 | 95.2901 |
+| map_27 | compra_d | D* | 662.863 | 605.6788 | 573.46 | 96.1786 |
+| map_27 | compra_nominal | Dnom | 676.668 | 618.9554 | 585.4385 | 98.0044 |
+| map_27 | D_completo | D* | 842 | 769.562 | 728.338 | 122.2138 |
+| map_27 | D_completo | Dnom | 842 | 770.2886 | 728.5032 | 121.8973 |
+
+## Notas de interpretación
+
+- Curva de compromiso: cada punto usa Σθ·D de la mejor semilla (menor objetivo) y la media de Z_opt sobre todas las semillas, que pueden tener D distinto. La figura omite γ > 100; la tabla de paso 1 sí los incluye.
+- Comparación de π: las filas con π = 4 y π = 10 de 1 ha y P1 son idénticas porque el presupuesto es activo en ambos (holgura ≤ $23) y la penalización extra ya no compra nada más. No es un error.
+
+## No incluido / pendiente
+
+Lo siguiente de la especificación no se hizo y no tiene salida en `results/`:
+
+- Validación exacta con CP-SAT (§9).
+- Comparación con DSATUR (§10).
+- Sensibilidades: κ = 0.4 y 0.8, radios × 0.75 y × 1.25, m × 0, 0.5 y 2, y s2.
+- Curvas de convergencia de un polígono de 8 ha: los CSV existen (`convergencia_map_*.csv`), pero sólo se grafican 1 ha y P1.
 
 ## Figuras
 

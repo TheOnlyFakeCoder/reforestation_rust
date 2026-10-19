@@ -119,27 +119,106 @@ def _paso2(o, cfg):
     ])
 
 
+def brechas_paso3(o, cfg=None):
+    """Huecos por instancia de paso 3: (V_lib - M) medio, partido en faltante de compra
+    (D_tot - T - M, es decir ΣC⁺ - M) y excedente de malla (|V| - D_tot)."""
+    cfg = cfg or leer_config()
+    p3 = _csv(o, "paso3_escenarios.csv")
+    m = _csv(o, "malla_resumen.csv").set_index("instancia")
+    p2 = _csv(o, "paso2_compra.csv")
+    p2 = p2[np.isclose(p2["epsilon"], cfg["epsilon"]) & np.isclose(p2["pi_factor"], cfg["pi_factor"])]
+    p2 = p2.set_index("instancia")
+    p3 = p3.assign(huecos=p3["V_lib"] - p3["M"],
+                   sumC=m["d_tot"].reindex(p3["instancia"]).to_numpy() - p3["T"] - p3["M"])
+    g = p3.groupby("instancia", sort=False).agg(huecos=("huecos", "mean"),
+                                                faltante_compra=("sumC", "mean"))
+    g.insert(0, "instancia", g.index)
+    g["excedente_malla"] = (m["n_pos"] - m["d_tot"]).reindex(g.index).to_numpy()
+    g["area_ha"] = m["area_ha"].reindex(g.index).to_numpy()
+    g["huecos_por_ha"] = g["huecos"] / g["area_ha"]
+    g["faltante_esperado_paso2"] = p2["faltante_esperado"].reindex(g.index).to_numpy()
+    g["holgura_presupuesto"] = (p2["presupuesto"] - p2["costo"]).reindex(g.index).to_numpy()
+    return g.reset_index(drop=True)
+
+
 def _paso3(o):
     r = _csv(o, "paso3_resumen.csv")
+    b = brechas_paso3(o)
     tot = int(r["casos_presupuesto_corto"].sum())
     n = int(r["n"].sum())
-    nota = (f"Los escenarios caen en `presupuesto_corto` en {tot} de {n} casos: con q cercano a la "
-            "mediana (π = 2c) la compra deja unas 12 posiciones vacías por hectárea. Es un hallazgo "
-            "del modelo, no un error.")
-    return nota + "\n\n" + tabla_md(r.drop(columns=["map_id"]))
+    ph = b["huecos_por_ha"]
+    sel = b[b["instancia"].isin(INSTANCIAS)]
+    h1 = float(b.loc[b["instancia"] == "1ha", "huecos_por_ha"].iloc[0])
+    h27 = float(b.loc[b["instancia"] == "map_27", "huecos_por_ha"].iloc[0])
+    nota = (
+        f"Los escenarios caen en `presupuesto_corto` en {tot} de {n} casos. El nombre es el de la "
+        "especificación para Σn < |V_lib|; aquí no lo causa el presupuesto. Con π = 2c la razón "
+        "crítica es 0.5, así que el modelo compra cerca de la mediana de C, y además la malla tiene "
+        "posiciones de más (|V| > D_tot). Como el caso `usual` exige Σn = |V_lib|, no se alcanza si "
+        "algún q_j < C_j o si |V| > D_tot.\n\n"
+        f"Huecos medios por hectárea, (V_lib − M)/A: entre {ph.min():.1f} y {ph.max():.1f} en las "
+        f"{len(b)} instancias ({h1:.1f} en 1 ha, {h27:.1f} en P1/map_27). Cada hueco se parte en "
+        "faltante de compra (ΣC⁺ − M, que coincide con el `faltante_esperado` del paso 2 salvo "
+        "por el número de escenarios: 100 aquí, 1000 allá) y excedente de malla (|V| − D_tot). "
+        f"El excedente de malla va de {int(b['excedente_malla'].min())} a "
+        f"{int(b['excedente_malla'].max())} posiciones.\n\n"
+        "El presupuesto no es activo con π = 2: la compra cabe en todas las instancias, con una "
+        f"holgura B·A − costo de ${b['holgura_presupuesto'].min():,.0f} a "
+        f"${b['holgura_presupuesto'].max():,.0f}. Es un hallazgo del modelo, no un error.")
+    cols = ["instancia", "area_ha", "huecos", "huecos_por_ha", "faltante_compra",
+            "faltante_esperado_paso2", "excedente_malla", "holgura_presupuesto"]
+    return (nota + "\n\nHuecos de paso 3 (1 ha y P1):\n\n" + tabla_md(sel[cols])
+            + "\n\nHuecos de paso 3 (todas las instancias):\n\n" + tabla_md(b[cols])
+            + "\n\nResumen del paso 3:\n\n" + tabla_md(r.drop(columns=["map_id"])))
 
 
 def _practica(o):
     c = _csv(o, "practica_compra.csv")
     c = c[c["instancia"].isin(INSTANCIAS)].drop(columns=["map_id", "escenarios"])
     d = _csv(o, "practica_distribucion.csv")
-    d = d[d["instancia"].isin(INSTANCIAS)]
-    m = _csv(o, "markov.csv")
-    m = m[m["instancia"].isin(INSTANCIAS)].groupby(["instancia", "composicion"], as_index=False)[
+    d = d[d["instancia"].isin(INSTANCIAS)].copy()
+    m = _csv(o, "malla_resumen.csv").set_index("instancia")
+    d["D_tot"] = m["d_tot"].reindex(d["instancia"]).to_numpy()
+    d["Z/D_tot"] = d["Z"] / d["D_tot"]
+    d["Z/ha"] = d["Z"] / m["area_ha"].reindex(d["instancia"]).to_numpy()
+    resto = [k for k in d.columns if k.startswith(("pares", "Z_nivel")) or k == "Z_otro"]
+    d = d[["instancia", "variante", "plantas", "D_tot", "Z", "Z_por_planta", "Z/D_tot", "Z/ha"] + resto]
+    mk = _csv(o, "markov.csv")
+    mk = mk[mk["instancia"].isin(INSTANCIAS)].groupby(
+        ["instancia", "base", "composicion"], as_index=False, sort=False)[
         ["plantas", "vivas_1ano", "vivas_2anos", "reposicion_esperada"]].sum()
+    orden = {"compra_d": 0, "compra_nominal": 1, "D_completo": 2}
+    mk = mk.assign(_o=mk["base"].map(orden)).sort_values(["instancia", "_o"]).drop(columns="_o")
     return ("Compra (a nominal 658/ha, b nominal 524/ha, c paso 2 ε = 0, d paso 2 ε = 0.1):\n\n"
-            + tabla_md(c) + "\n\nDistribución:\n\n" + tabla_md(d)
-            + "\n\nMarkov (totales por instancia y composición):\n\n" + tabla_md(m))
+            + tabla_md(c)
+            + "\n\nDistribución. `Z_por_planta` divide entre las plantas presentes (T + M), que en "
+            "las variantes con existentes son menos que D_tot; por eso se añaden Z/D_tot y Z/ha "
+            "(D_tot y el área vienen de `malla_resumen.csv`):\n\n" + tabla_md(d)
+            + "\n\nMarkov. Titular: las filas `compra_d` (compra del paso 2, ε = 0.1) y "
+            "`compra_nominal` (q = D̄) proyectan la supervivencia sobre las plantas realmente "
+            "plantadas, E[min(q_j, C⁺_j)] sobre los escenarios. Las filas `D_completo` suponen "
+            "plantar todo D sin plantas existentes, que ya sobrevivieron al establecimiento, y por "
+            "eso sobrestiman las vivas y la reposición (entre 24 % y 28 % en la reposición de 1 ha). Las vivas a 1 año de "
+            "`compra_d` en 1 ha coinciden con la opción d de `practica_compra.csv`.\n\n"
+            + tabla_md(mk))
+
+
+def _pendiente():
+    return ("Lo siguiente de la especificación no se hizo y no tiene salida en `results/`:\n\n"
+            "- Validación exacta con CP-SAT (§9).\n"
+            "- Comparación con DSATUR (§10).\n"
+            "- Sensibilidades: κ = 0.4 y 0.8, radios × 0.75 y × 1.25, m × 0, 0.5 y 2, y s2.\n"
+            "- Curvas de convergencia de un polígono de 8 ha: los CSV existen "
+            "(`convergencia_map_*.csv`), pero sólo se grafican 1 ha y P1.")
+
+
+def _notas():
+    return ("- Curva de compromiso: cada punto usa Σθ·D de la mejor semilla (menor objetivo) y la "
+            "media de Z_opt sobre todas las semillas, que pueden tener D distinto. La figura omite "
+            "γ > 100; la tabla de paso 1 sí los incluye.\n"
+            "- Comparación de π: las filas con π = 4 y π = 10 de 1 ha y P1 son idénticas porque el "
+            "presupuesto es activo en ambos (holgura ≤ $23) y la penalización extra ya no compra "
+            "nada más. No es un error.")
 
 
 def _figuras():
@@ -159,6 +238,8 @@ def generar(origen):
         "## Paso 2: compra\n\n" + _paso2(origen, cfg),
         "## Paso 3: ajuste al polígono real\n\n" + _paso3(origen),
         "## Práctica actual\n\n" + _practica(origen),
+        "## Notas de interpretación\n\n" + _notas(),
+        "## No incluido / pendiente\n\n" + _pendiente(),
         "## Figuras\n\n" + _figuras(),
     ]) + "\n"
 

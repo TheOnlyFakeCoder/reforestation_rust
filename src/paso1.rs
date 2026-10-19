@@ -1,6 +1,6 @@
 //! Paso 1: diseño de la composición D* y del patrón base φ* sobre la malla sin existentes.
 
-use crate::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+use crate::busqueda_tabu::{buscar, MotivoParo, ParamsTabu, Problema, Restriccion};
 use crate::competencia::{matriz_w, radio_max, radios, TablaCompetencia};
 use crate::composicion::{banda, composicion_nominal, Banda};
 use crate::config::Config;
@@ -93,6 +93,8 @@ pub struct FilaPaso1 {
     pub traza: Vec<f64>,
     /// Mejor objetivo del paso 1 por iteración.
     pub curva: Vec<f64>,
+    pub motivo_paro_paso1: MotivoParo,
+    pub motivo_paro_opt: MotivoParo,
 }
 
 impl FilaPaso1 {
@@ -118,6 +120,8 @@ impl FilaPaso1 {
             phi: Vec::new(),
             traza: Vec::new(),
             curva: Vec::new(),
+            motivo_paro_paso1: MotivoParo::SinMejora,
+            motivo_paro_opt: MotivoParo::SinMejora,
         }
     }
 }
@@ -180,6 +184,8 @@ pub fn resolver_paso1(
             phi: ajuste.phi.clone(),
             traza: paso1.traza,
             curva: paso1.curva,
+            motivo_paro_paso1: paso1.motivo_paro,
+            motivo_paro_opt: ajuste.motivo_paro,
         },
         ajuste.phi,
     )

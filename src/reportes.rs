@@ -1,9 +1,11 @@
 //! Tablas de resultados que se exportan a `results/`.
 
+use crate::busqueda_tabu::MotivoParo;
 use crate::competencia::{alcance, radio_max, radios};
 use crate::composicion::d_tot;
 use crate::config::Config;
 use crate::datos::{Datos, Especie, N_ESPECIES};
+use crate::escenarios::estadisticos;
 use crate::malla::{Disposicion, Malla};
 use crate::paso1::{mejor_fila, FilaPaso1, Instancia};
 use std::error::Error;
@@ -234,6 +236,8 @@ pub fn escribir_barrido_gamma(path: &Path, filas: &[FilaPaso1]) -> Result<(), Bo
             "iter_paso1",
             "tiempo_opt_s",
             "iter_opt",
+            "motivo_paro_paso1",
+            "motivo_paro_opt",
         ]
         .map(String::from),
     );
@@ -257,6 +261,8 @@ pub fn escribir_barrido_gamma(path: &Path, filas: &[FilaPaso1]) -> Result<(), Bo
             f.iter_paso1.to_string(),
             f.tiempo_opt_s.to_string(),
             f.iter_opt.to_string(),
+            f.motivo_paro_paso1.como_str().to_string(),
+            f.motivo_paro_opt.como_str().to_string(),
         ]);
         csv.write_record(&r)?;
     }
@@ -280,6 +286,9 @@ pub fn escribir_resumen_gamma(path: &Path, filas: &[FilaPaso1]) -> Result<(), Bo
             "z_opt_por_planta_media",
             "tiempo_medio_s",
             "iter_media",
+            "z_opt_sd",
+            "paros_tope",
+            "paros_sin_mejora",
         ]
         .map(String::from),
     );
@@ -300,6 +309,18 @@ pub fn escribir_resumen_gamma(path: &Path, filas: &[FilaPaso1]) -> Result<(), Bo
                 .filter(move |f| f.instancia == instancia && f.gamma == gamma)
         };
         let mejor = mejor_fila(grupo()).expect("grupo no vacío");
+        let z_opt: Vec<f64> = grupo().map(|f| f.z_opt).collect();
+        let z_opt_sd = estadisticos(&z_opt).1;
+        let paros = |m: MotivoParo| {
+            grupo()
+                .map(|f| {
+                    [f.motivo_paro_paso1, f.motivo_paro_opt]
+                        .iter()
+                        .filter(|&&x| x == m)
+                        .count()
+                })
+                .sum::<usize>()
+        };
         let mut r = vec![
             instancia.to_string(),
             mejor.map_id.to_string(),
@@ -321,6 +342,9 @@ pub fn escribir_resumen_gamma(path: &Path, filas: &[FilaPaso1]) -> Result<(), Bo
             media(grupo().map(|f| f.z_opt_por_planta)).to_string(),
             media(grupo().map(|f| f.tiempo_paso1_s + f.tiempo_opt_s)).to_string(),
             media(grupo().map(|f| (f.iter_paso1 + f.iter_opt) as f64)).to_string(),
+            z_opt_sd.to_string(),
+            paros(MotivoParo::Tope).to_string(),
+            paros(MotivoParo::SinMejora).to_string(),
         ]);
         csv.write_record(&r)?;
     }

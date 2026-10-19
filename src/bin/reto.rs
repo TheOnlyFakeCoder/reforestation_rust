@@ -11,6 +11,7 @@
 use std::path::Path;
 use std::process::ExitCode;
 
+use reforestation::busqueda_tabu::MotivoParo;
 use reforestation::competencia::matriz_w;
 use reforestation::config::Config;
 use reforestation::datos::{Datos, N_ESPECIES};
@@ -414,7 +415,6 @@ fn paso1(
     let semillas: Vec<u64> = (0..config.n_semillas as u64)
         .map(|k| config.semilla + k)
         .collect();
-    let params = config.tabu.params(config.semilla);
 
     let inicio = std::time::Instant::now();
     let mut todas: Vec<FilaPaso1> = Vec::new();
@@ -428,6 +428,9 @@ fn paso1(
             config.m_escala,
             config.usar_s2,
         );
+        let params = config
+            .tabu
+            .params_para(config.semilla, instancia.malla.len());
         let filas = barrido_gamma(&instancia, &gammas, &semillas, &params);
         let estrella = mejor_fila(filas.iter().filter(|f| f.gamma == config.gamma_star))
             .expect("γ* siempre se corre")
@@ -478,7 +481,6 @@ fn paso3(
     let datos = Datos::cargar(datos_dir)?;
     let pedidas = resolver_instancias(&datos, instancias)?;
     let mc = ParamsMc::leer(&resultados_dir.join("mc_params.json"))?;
-    let params = config.tabu.params(config.semilla);
     let inicio = std::time::Instant::now();
 
     let mut esc = csv::Writer::from_path(resultados_dir.join("paso3_escenarios.csv"))?;
@@ -494,6 +496,7 @@ fn paso3(
         "Z_por_planta",
         "tiempo_s",
         "iteraciones",
+        "motivo_paro",
     ])?;
     let mut res = csv::Writer::from_path(resultados_dir.join("paso3_resumen.csv"))?;
     res.write_record([
@@ -508,6 +511,8 @@ fn paso3(
         "casos_usual",
         "casos_presupuesto_corto",
         "casos_existentes_de_sobra",
+        "paros_tope",
+        "paros_sin_mejora",
     ])?;
     for (nombre, area) in &pedidas {
         let t0 = std::time::Instant::now();
@@ -530,6 +535,9 @@ fn paso3(
             mc: &mc,
             semilla: config.semilla,
         };
+        let params = config
+            .tabu
+            .params_para(config.semilla, instancia.malla.len());
         let (filas, phi0, e0) = correr_instancia(&entrada, config.n_escenarios_paso3, &params);
         for f in &filas {
             esc.write_record([
@@ -544,12 +552,14 @@ fn paso3(
                 f.z_por_planta.to_string(),
                 f.tiempo_s.to_string(),
                 f.iteraciones.to_string(),
+                f.motivo_paro.como_str().to_string(),
             ])?;
         }
         let z: Vec<f64> = filas.iter().map(|f| f.z).collect();
         let (media, sd) = estadisticos(&z);
         let casos = |c: reforestation::paso3::Caso| filas.iter().filter(|f| f.caso == c).count();
         use reforestation::paso3::Caso;
+        let paros = |m: MotivoParo| filas.iter().filter(|f| f.motivo_paro == m).count();
         res.write_record([
             nombre.clone(),
             instancia.map_id.to_string(),
@@ -562,6 +572,8 @@ fn paso3(
             casos(Caso::Usual).to_string(),
             casos(Caso::PresupuestoCorto).to_string(),
             casos(Caso::ExistentesDeSobra).to_string(),
+            paros(MotivoParo::Tope).to_string(),
+            paros(MotivoParo::SinMejora).to_string(),
         ])?;
         // Patrón del escenario 0 con la marca de las existentes, para los mapas.
         let mut patron = csv::Writer::from_path(
@@ -616,6 +628,83 @@ fn leer_m_omega0(path: &Path, nombre: &str) -> Result<usize, Box<dyn std::error:
     Err(format!("{}: sin ω = 0 para {nombre}", path.display()).into())
 }
 
+/// Valor de la columna `columna` de la primera fila que cumple `filtro`; vacío si falta el
+/// archivo, la columna o la fila (CSV de corridas anteriores a la columna de motivo de paro).
+fn primer_valor(
+    path: &Path,
+    columna: &str,
+    filtro: impl Fn(&dyn Fn(&str) -> Option<String>) -> bool,
+) -> String {
+    let Ok(mut lector) = csv::Reader::from_path(path) else {
+        return String::new();
+    };
+    let Ok(enc) = lector.headers().cloned() else {
+        return String::new();
+    };
+    for r in lector.records().flatten() {
+        let campo = |n: &str| enc.iter().position(|h| h == n).map(|i| r[i].to_string());
+        if filtro(&campo) {
+            return campo(columna).unwrap_or_default();
+        }
+    }
+    String::new()
+}
+
+/// Motivo de paro del ajuste C de la semilla elegida en γ* (la de menor objetivo del paso 1,
+/// γ·z_paso1 + Σθ·D), leído de `paso1_gamma_star.csv` o, si no existe, del barrido.
+fn leer_motivo_paso1(resultados_dir: &Path, nombre: &str, gamma_star: f64) -> String {
+    for archivo in ["paso1_gamma_star.csv", "paso1_barrido_gamma.csv"] {
+        let path = resultados_dir.join(archivo);
+        let Ok(mut lector) = csv::Reader::from_path(&path) else {
+            continue;
+        };
+        let Ok(enc) = lector.headers().cloned() else {
+            continue;
+        };
+        let num = |r: &csv::StringRecord, n: &str| {
+            enc.iter()
+                .position(|h| h == n)
+                .and_then(|i| r[i].parse::<f64>().ok())
+        };
+        let mut mejor: Option<(f64, String)> = None;
+        for r in lector.records().flatten() {
+            let (Some(g), Some(z), Some(t)) = (
+                num(&r, "gamma"),
+                num(&r, "z_paso1"),
+                num(&r, "suma_theta_d"),
+            ) else {
+                continue;
+            };
+            let Some(i) = enc.iter().position(|h| h == "instancia") else {
+                continue;
+            };
+            let Some(m) = enc.iter().position(|h| h == "motivo_paro_opt") else {
+                continue;
+            };
+            if &r[i] != nombre || (g - gamma_star).abs() > 1e-9 {
+                continue;
+            }
+            let objetivo = g * z + t;
+            if mejor.as_ref().is_none_or(|(o, _)| objetivo < *o) {
+                mejor = Some((objetivo, r[m].to_string()));
+            }
+        }
+        if let Some((_, motivo)) = mejor {
+            return motivo;
+        }
+    }
+    String::new()
+}
+
+/// Motivo de paro del escenario ω = 0 de `paso3_escenarios.csv`.
+fn leer_motivo_paso3_omega0(resultados_dir: &Path, nombre: &str) -> String {
+    primer_valor(
+        &resultados_dir.join("paso3_escenarios.csv"),
+        "motivo_paro",
+        |c| c("instancia").as_deref() == Some(nombre) && c("omega").as_deref() == Some("0"),
+    )
+}
+
 fn practica(
     datos_dir: &Path,
     resultados_dir: &Path,
@@ -641,6 +730,7 @@ fn practica(
         "Z_nivel4",
         "Z_nivel5",
         "Z_otro",
+        "motivo_paro",
     ])?;
     for (nombre, area) in &pedidas {
         let inst = Instancia::nueva(
@@ -666,14 +756,17 @@ fn practica(
         let iii = serpentina_con_existentes(&inst.malla, &e0.posiciones, DEFAULT_ROW_SEQUENCE, m);
         let sin = leer_patron(&resultados_dir.join(format!("paso1_patron_{nombre}.csv")))?;
         let con = leer_patron(&resultados_dir.join(format!("paso3_patron_{nombre}_omega0.csv")))?;
+        // Motivo de paro de las dos variantes tabú, tomado de los CSV de los pasos 1 y 3.
+        let motivo_sin = leer_motivo_paso1(resultados_dir, nombre, config.gamma_star);
+        let motivo_con = leer_motivo_paso3_omega0(resultados_dir, nombre);
         let variantes = [
-            ("i_serpentina", &i),
-            ("ii_serpentina_banda", &ii),
-            ("iii_serpentina_existentes", &iii),
-            ("tabu_sin_existentes", &sin),
-            ("tabu_con_existentes", &con),
+            ("i_serpentina", &i, String::new()),
+            ("ii_serpentina_banda", &ii, String::new()),
+            ("iii_serpentina_existentes", &iii, String::new()),
+            ("tabu_sin_existentes", &sin, motivo_sin),
+            ("tabu_con_existentes", &con, motivo_con),
         ];
-        for (variante, phi) in variantes {
+        for (variante, phi, motivo) in variantes {
             let d = desglose(phi, &inst.grafo, &inst.tabla, &datos.especies, &w);
             let mut fila = vec![
                 nombre.clone(),
@@ -689,6 +782,7 @@ fn practica(
                 d.pares_inmediatos.to_string(),
             ];
             fila.extend(d.niveles.iter().map(|x| x.to_string()));
+            fila.push(motivo);
             csv.write_record(&fila)?;
         }
         if nombre == "1ha" || nombre == "map_27" {

@@ -1,3 +1,90 @@
+# Reforestación CONAFOR: Entregable 2 (Optimización Estocástica)
+
+Modelo de reforestación con competencia entre especies: composición de especies (paso 1),
+compra de plantas bajo incertidumbre (paso 2), ajuste al polígono real con plantas existentes
+(paso 3) y comparación con la práctica actual. Los pasos 1 y 3 y la práctica están en Rust
+(búsqueda tabú); el ajuste de distribuciones, la compra (PLE) y las figuras están en Python.
+Los resultados están en `results/` (resumen en `results/RESUMEN.md`) y las figuras en `figures/`.
+
+## Requisitos
+
+- Rust estable (`cargo`).
+- Python con un entorno `.venv` en la raíz del repositorio:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install numpy scipy pandas matplotlib pulp highspy ortools pytest
+```
+
+(también están en `requirements.txt`).
+
+## Estructura
+
+| Ruta | Contenido |
+| --- | --- |
+| `src/` | Módulos del modelo en Rust: `config`, `datos`, `malla`, `competencia`, `objetivo`, `composicion`, `busqueda_tabu`, `paso1`, `escenarios`, `paso3`, `practica`, `reportes`; `src/bin/reto.rs` es el CLI |
+| `python/` | `comun.py`, `ajuste.py`, `paso2_compra.py`, `practica_compra.py`, `markov.py`, `figuras.py`, `resumen.py` y `tests/` |
+| `config/default.json` | Parámetros compartidos por Rust y Python (γ* = 3, ε = 0.1, π_factor = 2, tabú, semillas) |
+| `data/` | Datos del reto (los escribe `reto datos`) |
+| `results/` | CSV/JSON de cada paso y `RESUMEN.md` |
+| `figures/` | Figuras PNG (300 dpi) |
+
+## Pipeline completo
+
+Todo en orden con `.\run_all.ps1`. Paso a paso, desde la raíz en PowerShell:
+
+```powershell
+cargo build --release
+$reto = ".\target\release\reto.exe"
+$py = ".venv\Scripts\python.exe"
+
+& $reto datos
+& $reto malla
+& $py python\ajuste.py
+& $reto paso1 --instancias 1ha,map_27
+& $reto paso1 --instancias todas --solo-gamma-star
+& $reto montecarlo --instancias todas
+& $py python\paso2_compra.py
+& $reto paso3 --instancias todas
+& $reto practica
+& $py python\practica_compra.py
+& $py python\markov.py
+& $py python\figuras.py
+& $py python\resumen.py
+```
+
+## Cambiar parámetros
+
+Los subcomandos de `reto` aceptan:
+
+- `--datos DIR` y `--resultados DIR`: carpetas de entrada y salida (por defecto `data` y `results`).
+- `--config RUTA`: archivo JSON de configuración (por defecto `config/default.json`).
+- `--set clave=valor`: sobrescribe un parámetro; se puede repetir. Ejemplo:
+  `& $reto paso1 --instancias 1ha --set gamma_star=1 --set n_semillas=1`.
+- `--instancias LISTA`: `1ha`, `map_<id>` separados por comas, o `todas`
+  (por defecto `1ha,map_27`).
+- `--solo-gamma-star` (sólo `paso1`): corre únicamente γ* en vez del barrido de γ.
+- `--compra CSV` (sólo `paso3`): compra del paso 2 (por defecto `<resultados>/paso2_compra.csv`).
+
+`python\figuras.py` acepta nombres de figuras (`mapa`, `practica_distribucion`, ...) y
+`--instancias`; `python\resumen.py` acepta `--origen` y `--salida`.
+
+## Pruebas
+
+```powershell
+cargo test
+.venv\Scripts\python.exe -m pytest python/tests
+```
+
+## Otros binarios
+
+`ui` es una interfaz gráfica (egui) y `validar_paso2` compara el paso 2 en Rust con los resultados;
+el paso 2 oficial es `python\paso2_compra.py` (PuLP + HiGHS).
+
+---
+
+# Legacy (simulación original)
+
 # Reforestation
 
 A Rust workspace for planning species placement on reforestation polygons. Given a set of

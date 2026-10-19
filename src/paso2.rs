@@ -1,5 +1,8 @@
 //! Paso 2: compra de plantas por PLE con escenarios Monte Carlo.
 //!
+//! Es una heurística, no el paso 2 oficial: el oficial es `python/paso2_compra.py` (PuLP/HiGHS).
+//! Difiere de PuLP en 34 de 93 filas, con un objetivo ligeramente peor.
+//!
 //! Puerto de `python/paso2_compra.py`. Con D* fija, `C_jω = D*_j − X_jω` es la necesidad de la
 //! especie j en el escenario ω. Se compra un `q_j ≥ 0` entero por especie que minimiza
 //!

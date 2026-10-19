@@ -81,6 +81,10 @@ cargo test
 `ui` es una interfaz gráfica (egui) y `validar_paso2` compara el paso 2 en Rust con los resultados;
 el paso 2 oficial es `python\paso2_compra.py` (PuLP + HiGHS).
 
+Las cifras de `ui` (como máximo 10 escenarios, con respaldos cuando faltan archivos) son ilustrativas y no
+sustituyen a `results/`. `reto paso3` sólo corre con pares (ε, π) presentes en `paso2_compra.csv`: ε entre los
+valores escritos y `pi_factor` en {2, 4, 10}.
+
 ---
 
 # Legacy (simulación original)

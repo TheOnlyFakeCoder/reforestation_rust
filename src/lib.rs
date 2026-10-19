@@ -2,6 +2,7 @@
 
 pub mod algorithm;
 pub mod busqueda_tabu;
+pub mod calibracion;
 pub mod competencia;
 pub mod competition;
 pub mod composicion;

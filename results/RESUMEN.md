@@ -102,29 +102,29 @@ Parámetros de Monte Carlo (`mc_params.json`): μ = 129.1823, σ = 3.2896.
 
 Barrido de γ, 1ha:
 
-| gamma | suma_theta_d | suma_c_d | z_opt_media | z_opt_min | z_opt_max | z_opt_por_planta_media |
-| --- | --- | --- | --- | --- | --- | --- |
-| 0 | 1274.0922 | 15500 | 614.6018 | 610.0119 | 618.9356 | 0.934 |
-| 0.1 | 1274.0922 | 15500 | 607.3206 | 607.0669 | 607.612 | 0.923 |
-| 0.3 | 1274.6018 | 15452 | 607.5857 | 606.2019 | 610.1683 | 0.9234 |
-| 1 | 1277.3292 | 15444 | 599.9329 | 597.9214 | 601.2848 | 0.9118 |
-| 3 | 1343.7892 | 15422 | 571.4363 | 569.0427 | 574.7853 | 0.8684 |
-| 10 | 1350.9808 | 15422 | 571.6676 | 571.2321 | 572.4726 | 0.8688 |
-| 30 | 1350.9808 | 15422 | 572.9945 | 572.3065 | 573.3735 | 0.8708 |
-| 100 | 1350.9808 | 15422 | 573.6912 | 571.661 | 576.7734 | 0.8719 |
+| gamma | suma_theta_d | suma_c_d | z_opt_media | z_opt_min | z_opt_max | z_opt_sd | z_opt_por_planta_media |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 1274.0922 | 15500 | 614.6018 | 610.0119 | 618.9356 | 4.4674 | 0.934 |
+| 0.1 | 1274.0922 | 15500 | 607.3206 | 607.0669 | 607.612 | 0.2745 | 0.923 |
+| 0.3 | 1274.6018 | 15452 | 607.5857 | 606.2019 | 610.1683 | 2.2385 | 0.9234 |
+| 1 | 1277.3292 | 15444 | 599.9329 | 597.9214 | 601.2848 | 1.7761 | 0.9118 |
+| 3 | 1343.7892 | 15422 | 571.4363 | 569.0427 | 574.7853 | 2.9881 | 0.8684 |
+| 10 | 1350.9808 | 15422 | 571.6676 | 571.2321 | 572.4726 | 0.6979 | 0.8688 |
+| 30 | 1350.9808 | 15422 | 572.9945 | 572.3065 | 573.3735 | 0.5969 | 0.8708 |
+| 100 | 1350.9808 | 15422 | 573.6912 | 571.661 | 576.7734 | 2.7137 | 0.8719 |
 
 Barrido de γ, map_27:
 
-| gamma | suma_theta_d | suma_c_d | z_opt_media | z_opt_min | z_opt_max | z_opt_por_planta_media |
-| --- | --- | --- | --- | --- | --- | --- |
-| 0 | 1626.8441 | 19833.5 | 789.4162 | 785.0944 | 792.8232 | 0.9375 |
-| 0.1 | 1626.8441 | 19833.5 | 786.0423 | 781.3402 | 788.7523 | 0.9335 |
-| 0.3 | 1627.3355 | 19761.5 | 784.2126 | 781.3567 | 788.7544 | 0.9314 |
-| 1 | 1632.5303 | 19761.5 | 777.0214 | 774.108 | 780.2459 | 0.9228 |
-| 3 | 1723.8049 | 19732.5 | 739.6761 | 738.8838 | 740.3301 | 0.8785 |
-| 10 | 1732.5669 | 19732.5 | 736.4782 | 735.3834 | 738.5877 | 0.8747 |
-| 30 | 1732.5669 | 19732.5 | 737.177 | 735.8773 | 738.3533 | 0.8755 |
-| 100 | 1732.5669 | 19732.5 | 738.5592 | 738.3483 | 738.9622 | 0.8771 |
+| gamma | suma_theta_d | suma_c_d | z_opt_media | z_opt_min | z_opt_max | z_opt_sd | z_opt_por_planta_media |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 1626.8441 | 19833.5 | 789.4162 | 785.0944 | 792.8232 | 3.9448 | 0.9375 |
+| 0.1 | 1626.8441 | 19833.5 | 786.0423 | 781.3402 | 788.7523 | 4.0879 | 0.9335 |
+| 0.3 | 1627.3355 | 19761.5 | 784.2126 | 781.3567 | 788.7544 | 3.9766 | 0.9314 |
+| 1 | 1632.5303 | 19761.5 | 777.0214 | 774.108 | 780.2459 | 3.0808 | 0.9228 |
+| 3 | 1723.8049 | 19732.5 | 739.6761 | 738.8838 | 740.3301 | 0.733 | 0.8785 |
+| 10 | 1732.5669 | 19732.5 | 736.4782 | 735.3834 | 738.5877 | 1.8273 | 0.8747 |
+| 30 | 1732.5669 | 19732.5 | 737.177 | 735.8773 | 738.3533 | 1.2426 | 0.8755 |
+| 100 | 1732.5669 | 19732.5 | 738.5592 | 738.3483 | 738.9622 | 0.3492 | 0.8771 |
 
 D* por instancia (γ*):
 
@@ -376,7 +376,7 @@ Huecos de paso 3 (todas las instancias):
 | map_5 | 7.56 | 38.17 | 5.0489 | 35.17 | 36.87 | 3 | 829 |
 | map_1 | 5.4 | 32.65 | 6.0463 | 31.65 | 30.807 | 1 | 607.5 |
 
-Resumen del paso 3:
+Resumen del paso 3. `Z_sd` es la desviación sobre escenarios (una semilla por escenario), no sobre semillas de una misma instancia:
 
 | instancia | n | Z_media | Z_sd | Z_p5 | Z_p50 | Z_p95 | casos_usual | casos_presupuesto_corto | casos_existentes_de_sobra | paros_tope | paros_sin_mejora |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -455,6 +455,112 @@ Markov. Titular: las filas `compra_d` (compra del paso 2, ε = 0.1) y `compra_no
 | map_27 | D_completo | D* | 842 | 769.562 | 728.338 | 122.2138 |
 | map_27 | D_completo | Dnom | 842 | 770.2886 | 728.5032 | 121.8973 |
 
+## Convergencia del tabú
+
+Tope escalado por tamaño de la malla: max_iter_efectivo = max(max_iter, iter_por_posicion·|V|) y max_sin_mejora_efectivo = max(max_sin_mejora, sin_mejora_por_posicion·|V|). Criterio: al menos 90 % de las búsquedas tabú terminan por `sin_mejora` en total y 80 % en cada instancia. Se cumple: 3382 de 3382 búsquedas (100.0 %) y el mínimo por instancia es 100.0 %.
+
+### Motivos de paro
+
+Por instancia, sobre todas las búsquedas del pipeline:
+
+| instancia | busquedas | paros_tope | paros_sin_mejora | frac_sin_mejora |
+| --- | --- | --- | --- | --- |
+| 1ha | 154 | 0 | 154 | 1 |
+| map_27 | 154 | 0 | 154 | 1 |
+| map_28 | 106 | 0 | 106 | 1 |
+| map_30 | 106 | 0 | 106 | 1 |
+| map_20 | 106 | 0 | 106 | 1 |
+| map_21 | 106 | 0 | 106 | 1 |
+| map_22 | 106 | 0 | 106 | 1 |
+| map_23 | 106 | 0 | 106 | 1 |
+| map_24 | 106 | 0 | 106 | 1 |
+| map_18 | 106 | 0 | 106 | 1 |
+| map_17 | 106 | 0 | 106 | 1 |
+| map_16 | 106 | 0 | 106 | 1 |
+| map_19 | 106 | 0 | 106 | 1 |
+| map_25 | 106 | 0 | 106 | 1 |
+| map_26 | 106 | 0 | 106 | 1 |
+| map_13 | 106 | 0 | 106 | 1 |
+| map_31 | 106 | 0 | 106 | 1 |
+| map_14 | 106 | 0 | 106 | 1 |
+| map_15 | 106 | 0 | 106 | 1 |
+| map_7 | 106 | 0 | 106 | 1 |
+| map_8 | 106 | 0 | 106 | 1 |
+| map_9 | 106 | 0 | 106 | 1 |
+| map_10 | 106 | 0 | 106 | 1 |
+| map_11 | 106 | 0 | 106 | 1 |
+| map_12 | 106 | 0 | 106 | 1 |
+| map_6 | 106 | 0 | 106 | 1 |
+| map_2 | 106 | 0 | 106 | 1 |
+| map_3 | 106 | 0 | 106 | 1 |
+| map_4 | 106 | 0 | 106 | 1 |
+| map_5 | 106 | 0 | 106 | 1 |
+| map_1 | 106 | 0 | 106 | 1 |
+| total | 3382 | 0 | 3382 | 1 |
+
+### Corrida de referencia
+
+La corrida de referencia usa topes 10 veces mayores (iter_por_posicion = 3000); `dif_rel` es la diferencia relativa de z_opt_media de la corrida final contra la referencia (criterio: <= 0.5 %): map_27: 0.071 %, map_21: 0.174 %. Con topes 100/4 (iter_por_posicion / sin_mejora_por_posicion) map_21 no pasó esta verificación (0.604 % > 0.5 %); el usuario eligió subir los topes a 300/8, con lo que se cumplen el criterio de paro y la referencia.
+
+| instancia | corrida | candidatos | tenure | iter_por_posicion | sin_mejora_por_posicion | max_iter_efectivo | max_sin_mejora_efectivo | z_opt_media | z_opt_sd | tiempo_medio_s | dif_rel |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| map_27 | final | 128 | 10 | 300 | 8 | 252600 | 6736 | 739.6761 | 0.733 | 0.1949 | 0.0007 |
+| map_21 | final | 128 | 10 | 300 | 8 | 1579200 | 42112 | 4855.1533 | 7.7659 | 2.6325 | 0.0017 |
+| map_21 | referencia | 128 | 10 | 3000 | 10 | 15792000 | 52640 | 4846.7244 | 5.5576 | 4.4014 | 0 |
+| map_27 | referencia | 128 | 10 | 3000 | 10 | 2526000 | 8420 | 739.1494 | 1.2858 | 0.246 | 0 |
+
+### Calibración de K y tenure
+
+Calibración con γ = γ* = 3 en 1 ha y map_21, 5 semillas por combinación. z_rel es z_opt_media entre el mínimo de la rejilla en esa instancia. Regla: menor promedio de z_rel entre las dos instancias; si otra combinación queda a <= 0.001 de ese promedio y es más rápida, se elige la más rápida. Resultado: K = 128, tenure = 10.
+
+| instancia | candidatos | tenure | n_semillas | z_opt_media | z_opt_sd | z_rel | tiempo_medio_s | iter_media | frac_sin_mejora |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1ha | 32 | 10 | 5 | 587.5446 | 2.1169 | 1.0275 | 0.05 | 30829.6 | 1 |
+| 1ha | 32 | 15 | 5 | 587.4524 | 1.5687 | 1.0273 | 0.0595 | 27890.2 | 1 |
+| 1ha | 32 | 25 | 5 | 588.3126 | 1.6428 | 1.0288 | 0.0477 | 29138 | 1 |
+| 1ha | 64 | 10 | 5 | 574.1771 | 2.0695 | 1.0041 | 0.1551 | 44576.2 | 1 |
+| 1ha | 64 | 15 | 5 | 574.0766 | 1.3373 | 1.0039 | 0.1511 | 46833 | 1 |
+| 1ha | 64 | 25 | 5 | 574.6137 | 1.4655 | 1.0049 | 0.1407 | 36379.6 | 1 |
+| 1ha | 128 | 10 | 5 | 571.8365 | 2.2322 | 1 | 0.3958 | 64569.2 | 1 |
+| 1ha | 128 | 15 | 5 | 572.5971 | 2.2835 | 1.0013 | 0.3771 | 60196.2 | 1 |
+| 1ha | 128 | 25 | 5 | 573.6589 | 2.2155 | 1.0032 | 0.3414 | 53353.6 | 1 |
+| map_21 | 32 | 10 | 5 | 4963.1842 | 11.3215 | 1.0239 | 0.8209 | 392150 | 1 |
+| map_21 | 32 | 15 | 5 | 4977.1105 | 11.2075 | 1.0268 | 0.6731 | 328759.2 | 1 |
+| map_21 | 32 | 25 | 5 | 4967.5366 | 3.5859 | 1.0248 | 0.8898 | 430000.4 | 1 |
+| map_21 | 64 | 10 | 5 | 4862.3757 | 5.738 | 1.0031 | 1.8441 | 488951.8 | 1 |
+| map_21 | 64 | 15 | 5 | 4854.0864 | 7.9062 | 1.0014 | 2.2897 | 615548.8 | 1 |
+| map_21 | 64 | 25 | 5 | 4853.3966 | 7.3955 | 1.0013 | 2.3418 | 595663.6 | 1 |
+| map_21 | 128 | 10 | 5 | 4854.887 | 5.9833 | 1.0016 | 6.5883 | 867244.6 | 1 |
+| map_21 | 128 | 15 | 5 | 4850.2983 | 7.4385 | 1.0007 | 8.1429 | 1075774.4 | 1 |
+| map_21 | 128 | 25 | 5 | 4847.1113 | 7.2244 | 1 | 8.1278 | 1087610.2 | 1 |
+
+Promedio entre instancias:
+
+| candidatos | tenure | z_rel_prom | tiempo_prom_s |
+| --- | --- | --- | --- |
+| 32 | 10 | 1.0257 | 0.4355 |
+| 32 | 15 | 1.0271 | 0.3663 |
+| 32 | 25 | 1.0268 | 0.4687 |
+| 64 | 10 | 1.0036 | 0.9996 |
+| 64 | 15 | 1.0027 | 1.2204 |
+| 64 | 25 | 1.0031 | 1.2412 |
+| 128 | 10 | 1.0008 | 3.4921 |
+| 128 | 15 | 1.001 | 4.26 |
+| 128 | 25 | 1.0016 | 4.2346 |
+
+### Parámetros finales del tabú
+
+Leídos de `config/default.json`:
+
+| parámetro | valor |
+| --- | --- |
+| candidatos | 128 |
+| tenure | 10 |
+| max_iter | 20000 |
+| max_sin_mejora | 3000 |
+| iter_por_posicion | 300 |
+| sin_mejora_por_posicion | 8 |
+
 ## Notas de interpretación
 
 - Curva de compromiso: cada punto usa Σθ·D de la mejor semilla (menor objetivo) y la media de Z_opt sobre todas las semillas, que pueden tener D distinto. La figura omite γ > 100; la tabla de paso 1 sí los incluye.
@@ -467,7 +573,7 @@ Lo siguiente de la especificación no se hizo y no tiene salida en `results/`:
 - Validación exacta con CP-SAT (§9).
 - Comparación con DSATUR (§10).
 - Sensibilidades: κ = 0.4 y 0.8, radios × 0.75 y × 1.25, m × 0, 0.5 y 2, y s2.
-- Curvas de convergencia de un polígono de 8 ha: los CSV existen (`convergencia_map_*.csv`), pero sólo se grafican 1 ha y P1.
+
 
 ## Figuras
 
@@ -478,6 +584,7 @@ Lo siguiente de la especificación no se hizo y no tiene salida en `results/`:
 - [Curva de compromiso competencia vs. costo, P1](../figures/curva_compromiso_map_27.png)
 - [Convergencia del tabú del paso 1, 1 ha](../figures/convergencia_1ha.png)
 - [Convergencia del tabú del paso 1, P1](../figures/convergencia_map_27.png)
+- [Convergencia del tabú del paso 1, map_21 (mayor |V|)](../figures/convergencia_map_21.png)
 - [Mapa socia vs. tabú (paso 3, ω = 0), 1 ha](../figures/mapa_1ha.png)
 - [Mapa socia vs. tabú (paso 3, ω = 0), P1](../figures/mapa_map_27.png)
 - [Práctica actual vs. modelo: compra de plantas](../figures/practica_compra.png)

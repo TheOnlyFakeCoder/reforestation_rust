@@ -20,6 +20,7 @@ FIGURAS_LISTA = [
     ("curva_compromiso_map_27.png", "Curva de compromiso competencia vs. costo, P1"),
     ("convergencia_1ha.png", "Convergencia del tabú del paso 1, 1 ha"),
     ("convergencia_map_27.png", "Convergencia del tabú del paso 1, P1"),
+    ("convergencia_map_21.png", "Convergencia del tabú del paso 1, map_21 (mayor |V|)"),
     ("mapa_1ha.png", "Mapa socia vs. tabú (paso 3, ω = 0), 1 ha"),
     ("mapa_map_27.png", "Mapa socia vs. tabú (paso 3, ω = 0), P1"),
     ("practica_compra.png", "Práctica actual vs. modelo: compra de plantas"),
@@ -85,7 +86,7 @@ def _paso1(o, gamma_star):
     partes = [f"γ* = {gamma_star:g}, elegido por el usuario en el codo de la curva de compromiso."]
     for inst in INSTANCIAS:
         s = g[g["instancia"] == inst][["gamma", "suma_theta_d", "suma_c_d", "z_opt_media", "z_opt_min",
-                                       "z_opt_max", "z_opt_por_planta_media"]]
+                                       "z_opt_max", "z_opt_sd", "z_opt_por_planta_media"]]
         partes.append(f"Barrido de γ, {inst}:\n\n" + tabla_md(s))
     c = _csv(o, "paso1_composicion.csv")
     cols = ["instancia", "d_tot"] + [f"D_{j}" for j in range(10)]
@@ -169,7 +170,9 @@ def _paso3(o):
             "faltante_esperado_paso2", "excedente_malla", "holgura_presupuesto"]
     return (nota + "\n\nHuecos de paso 3 (1 ha y P1):\n\n" + tabla_md(sel[cols])
             + "\n\nHuecos de paso 3 (todas las instancias):\n\n" + tabla_md(b[cols])
-            + "\n\nResumen del paso 3:\n\n" + tabla_md(r.drop(columns=["map_id"])))
+            + "\n\nResumen del paso 3. `Z_sd` es la desviación sobre escenarios (una semilla por "
+            "escenario), no sobre semillas de una misma instancia:\n\n"
+            + tabla_md(r.drop(columns=["map_id"])))
 
 
 def _practica(o):
@@ -203,13 +206,228 @@ def _practica(o):
             + tabla_md(mk))
 
 
-def _pendiente():
+def eleccion_calibracion(c):
+    """Regla de elección de (K, tenure): menor promedio de z_rel entre instancias; si otra
+    combinación queda a <= 0.001 y es más rápida (tiempo medio promedio), se elige la más rápida."""
+    c = c.assign(z_rel=c["z_opt_media"] / c.groupby("instancia")["z_opt_media"].transform("min"))
+    g = c.groupby(["candidatos", "tenure"]).agg(z_rel=("z_rel", "mean"),
+                                                tiempo=("tiempo_medio_s", "mean")).reset_index()
+    mejor = g.loc[g["z_rel"].idxmin()]
+    cerca = g[(g["z_rel"] <= mejor["z_rel"] + 0.001) & (g["tiempo"] < mejor["tiempo"])]
+    if len(cerca):
+        mejor = cerca.loc[cerca["tiempo"].idxmin()]
+    return int(mejor["candidatos"]), int(mejor["tenure"])
+
+
+def _convergencia(o, cfg):
+    t = cfg["tabu"]
+    crit = _csv(o, "convergencia_criterio.csv")
+    ref = _csv(o, "convergencia_referencia.csv")
+    cal = _csv(o, "calibracion_tabu.csv")
+    tot = crit[crit["instancia"] == "total"].iloc[0]
+    por = crit[crit["instancia"] != "total"]
+    cal = cal.assign(z_rel=cal["z_opt_media"] / cal.groupby("instancia")["z_opt_media"].transform("min"))
+    k, ten = eleccion_calibracion(cal.drop(columns="z_rel"))
+    prom = cal.groupby(["candidatos", "tenure"], as_index=False).agg(
+        z_rel_prom=("z_rel", "mean"), tiempo_prom_s=("tiempo_medio_s", "mean"))
+    cols = ["instancia", "candidatos", "tenure", "n_semillas", "z_opt_media", "z_opt_sd", "z_rel",
+            "tiempo_medio_s", "iter_media", "frac_sin_mejora"]
+    fin = ref[ref["corrida"] == "final"].set_index("instancia")
+    dr = ", ".join(f"{i}: {100 * r['dif_rel']:.3f} %" for i, r in fin.iterrows())
+    intro = (
+        f"Tope escalado por tamaño de la malla: max_iter_efectivo = max(max_iter, "
+        f"iter_por_posicion·|V|) y max_sin_mejora_efectivo = max(max_sin_mejora, "
+        f"sin_mejora_por_posicion·|V|). Criterio: al menos 90 % de las búsquedas tabú terminan por "
+        f"`sin_mejora` en total y 80 % en cada instancia. Se cumple: {tot['paros_sin_mejora']:.0f} de "
+        f"{tot['busquedas']:.0f} búsquedas ({100 * tot['frac_sin_mejora']:.1f} %) y el mínimo por instancia es "
+        f"{100 * por['frac_sin_mejora'].min():.1f} %.")
+    refp = (
+        "La corrida de referencia usa topes 10 veces mayores (iter_por_posicion = 3000); "
+        "`dif_rel` es la diferencia relativa de z_opt_media de la corrida final contra la referencia "
+        f"(criterio: <= 0.5 %): {dr}. Con topes 100/4 (iter_por_posicion / sin_mejora_por_posicion) "
+        "map_21 no pasó esta verificación (0.604 % > 0.5 %); el usuario eligió subir los topes a 300/8, "
+        "con lo que se cumplen el criterio de paro y la referencia.")
+    calp = (
+        "Calibración con γ = γ* = 3 en 1 ha y map_21, 5 semillas por combinación. z_rel es "
+        "z_opt_media entre el mínimo de la rejilla en esa instancia. Regla: menor promedio de z_rel "
+        "entre las dos instancias; si otra combinación queda a <= 0.001 de ese promedio y es más "
+        f"rápida, se elige la más rápida. Resultado: K = {k}, tenure = {ten}.")
+    par = pd.DataFrame({"parámetro": ["candidatos", "tenure", "max_iter", "max_sin_mejora",
+                                      "iter_por_posicion", "sin_mejora_por_posicion"],
+                        "valor": [t["candidatos"], t["tenure"], t["max_iter"], t["max_sin_mejora"],
+                                  t["iter_por_posicion"], t["sin_mejora_por_posicion"]]})
+    return "\n\n".join([
+        intro,
+        "### Motivos de paro\n\nPor instancia, sobre todas las búsquedas del pipeline:\n\n"
+        + tabla_md(crit),
+        "### Corrida de referencia\n\n" + refp + "\n\n" + tabla_md(ref),
+        "### Calibración de K y tenure\n\n" + calp + "\n\n" + tabla_md(cal[cols])
+        + "\n\nPromedio entre instancias:\n\n" + tabla_md(prom),
+        "### Parámetros finales del tabú\n\nLeídos de `config/default.json`:\n\n" + tabla_md(par),
+    ])
+
+
+def _pct(v):
+    """Brecha relativa como porcentaje; ∞ si la cota no es positiva."""
+    if v != v:
+        return ""
+    if np.isinf(v):
+        return "∞"
+    p = 100 * v
+    if p == 0:
+        return "0"
+    return f"{p:.1e}" if abs(p) < 1e-3 else f"{p:.3g}"
+
+
+def brechas_vs_cota_valida(v):
+    """Brechas de la mejor semilla y de la media contra la referencia válida para los coeficientes
+    originales: Z* si el óptimo está probado; si no, cota − tolerancia_redondeo (∞ si es ≤ 0)."""
+    ref = v["z_opt"].where(v["optimo_probado"], v["cota"] - v["tolerancia_redondeo"])
+    out = {}
+    for c, z in (("brecha_mejor", "z_ts_mejor"), ("brecha_media", "z_ts_media")):
+        out[c] = ((v[z] - ref) / ref).where(ref > 0, np.inf)
+    return v.assign(**out)
+
+
+def validacion_definitiva(v):
+    """Una fila por instancia: la de óptimo probado si la hay; si no, la de mayor cota."""
+    v = v.assign(_o=~v["optimo_probado"].astype(bool), _c=-v["cota"])
+    orden = list(dict.fromkeys(v["id"]))
+    d = v.sort_values(["_o", "_c"], kind="stable").groupby("id", sort=False).head(1)
+    return d.set_index("id").loc[orden].reset_index().drop(columns=["_o", "_c"])
+
+
+def _validacion(o):
+    ruta = Path(o) / "validacion_exacta.csv"
+    if not ruta.exists():
+        return ("La validación exacta no se ha corrido (`python/validacion_exacta.py`, que lee "
+                "`results/validacion/` de `reto instancias-val` y `reto tabu-val`).")
+    v = pd.read_csv(ruta)
+    v["optimo_probado"] = v["optimo_probado"].astype(bool)
+    v = brechas_vs_cota_valida(v)
+    d = validacion_definitiva(v)
+    n = len(d)
+    opt = d[d["optimo_probado"]]
+    no = d[~d["optimo_probado"]]
+    por_form = {f: int((opt["formulacion"] == f).sum()) for f in ("basica", "ajustada")}
+    tl = ", ".join(f"{t:g}" for t in sorted(v["tiempo_limite_s"].unique()))
+    wk = ", ".join(str(int(w)) for w in sorted(v["workers"].unique()))
+    n3, n1 = int((d["modelo"] == "paso3").sum()), int((d["modelo"] == "paso1").sum())
+    i_max = d["brecha_mejor"].idxmax()
+    semillas = sorted({len(pd.read_csv(t)) for t in (Path(o) / "validacion").glob("tabu_*.csv")})
+    de_semillas = f" (de {', '.join(map(str, semillas))} semillas)" if semillas else ""
+    hay_ajustada = (v["formulacion"] == "ajustada").any()
+    partes = [
+        f"Se corrió CP-SAT (OR-Tools) sobre {n} instancias pequeñas ({n3} del paso 3, ec. 24, y {n1} "
+        f"del paso 1, ec. 21) con un límite de {tl} s y {wk} workers por formulación"
+        + (f"; ninguna se probó óptima en ese tiempo" if len(opt) == 0 else "") + ". En las "
+        f"{len(v)} corridas CP-SAT arrancó con la mejor solución del tabú{de_semillas} como hint "
+        "(`AddHint`). "
+        + ("Primero se corrió la formulación básica y, donde no cerró, también la ajustada; la "
+           "tabla tiene ambas filas. " if hay_ajustada else "Se usó la formulación básica. ")
+        + "Los coeficientes enteros del modelo son round(γ·w·h·10 000) para los pares libre–libre; "
+        "para los términos libre–fijo, el agregado por (v, j), (θ_j + γ·Σ w·h), redondeado una "
+        "sola vez; y θ·10 000 en el paso 1. Z*, Z_TS y las brechas usan los coeficientes "
+        f"originales (error de redondeo máximo por coeficiente: {v['error_redondeo_max'].max():.1e}). "
+        "Antes de comparar, el Z/objetivo de Python de cada solución del tabú se verificó contra "
+        "el reportado por `tabu-val` de Rust, y el de cada solución de CP-SAT se reevaluó con "
+        "`reto evaluar-val`; ambos coinciden a 1e-6.",
+        f"Óptimo probado en {len(opt)} de {n} instancias ({por_form['basica']} con la formulación "
+        f"básica y {por_form['ajustada']} con la ajustada)"
+        + (f": {', '.join(opt['id'])}." if len(opt) else "."),
+    ]
+    if len(no):
+        partes.append(
+            "Sin óptimo probado: " + ", ".join(
+                f"{r.id} (cota {r.cota:.4f}, incumbente {r.z_opt:.4f}, {r.formulacion})"
+                for r in no.itertuples())
+            + ". En ellas la brecha se mide contra la cota − tolerancia de redondeo (cota válida "
+            "para el problema con coeficientes originales), así que es una cota superior de la "
+            "brecha real; para cada instancia se toma la fila de óptimo probado o, si no la hay, "
+            "la de mayor cota.")
+        hueco = (no["z_opt"] - no["cota"]) / no["cota"]
+        partes.append(
+            f"En esas filas la incumbente de CP-SAT queda entre {_pct(hueco.min())} % y "
+            f"{_pct(hueco.max())} % por encima de la cota, así que la brecha contra la cota está "
+            "dominada por la debilidad de la cota más que por la calidad de las soluciones. La "
+            "suma de los peores errores de redondeo por término en una solución (tolerancia del "
+            f"modelo escalado) es a lo más {v['tolerancia_redondeo'].max():.3f}.")
+    partes.append(
+        f"Brecha de la mejor semilla del tabú (contra el óptimo o la cota): máxima "
+        f"{_pct(d.loc[i_max, 'brecha_mejor'])} % ({d.loc[i_max, 'id']}), media "
+        f"{_pct(d['brecha_mejor'].mean())} %. Brecha de la media de las semillas: máxima "
+        f"{_pct(d['brecha_media'].max())} %, media {_pct(d['brecha_media'].mean())} %. Contra "
+        f"la incumbente de CP-SAT, la mejor semilla queda entre "
+        f"{_pct(d['brecha_vs_incumbente'].min())} % y {_pct(d['brecha_vs_incumbente'].max())} %"
+        + (" (negativa: el tabú quedó mejor que la incumbente de CP-SAT)."
+           if (d["brecha_vs_incumbente"] < 0).any() else "."))
+    mejora = d[d["brecha_vs_incumbente"] > 1e-12]
+    partes.append(
+        f"La incumbente de CP-SAT mejora a la mejor semilla del tabú en {len(mejora)} de {n} "
+        "instancias (con los coeficientes originales).")
+    if len(no):
+        partes.append(
+            "Fracción de semillas que alcanzan el valor de la incumbente (|Z_TS − Z*| ≤ "
+            "1e-6·max(1, Z*)) en las instancias sin óptimo probado, contra la incumbente de CP-SAT: "
+            + ", ".join(f"{r.id}: {r.frac_semillas_optimo:.1f}" for r in no.itertuples()) + ". "
+            "En la tabla esta fracción sólo se muestra con óptimo probado (– si no): sin él no es "
+            "significativa, porque en las filas básicas la incumbente puede ser la propia solución "
+            "del hint del tabú.")
+    if len(opt):
+        partes.append(
+            "Fracción de semillas que alcanzan el valor de CP-SAT (|Z_TS − Z*| ≤ 1e-6·max(1, Z*)), "
+            "en las instancias con óptimo probado: "
+            + ", ".join(f"{r.id}: {r.frac_semillas_optimo:.1f}" for r in opt.itertuples()) + ".")
+    p1 = d[d["modelo"] == "paso1"]
+    if len(p1):
+        partes.append(
+            "Paso 1: brecha_z = (γ·Z_TS − γ·Z*)/(γ·Z*), la competencia de la mejor semilla contra "
+            "la de la incumbente de CP-SAT (no contra el óptimo): "
+            + ", ".join(f"{r.id}: {_pct(r.brecha_z)} %" for r in p1.itertuples())
+            + ". Especies con L_j < U_j (n_especies_libres): "
+            + ", ".join(f"{r.id}: {int(r.n_especies_libres)}" for r in p1.itertuples())
+            + ".")
+        una = p1[p1["n_especies_libres"] == 1]["id"].tolist()
+        if una:
+            partes[-1] += (f" En {', '.join(una)} sólo hay una especie libre y Σ D_j = D_tot está "
+                           "fijo, así que la composición queda determinada y Σθ·D es constante: "
+                           "esas instancias validan sólo el acomodo.")
+    if np.isinf(v["brecha_mejor"]).any():
+        inf = v[np.isinf(v["brecha_mejor"])]
+        partes.append("∞ (" + "; ".join(f"{r.id}, {r.formulacion}" for r in inf.itertuples())
+                      + "): la cota es ≤ 0, así que la brecha relativa contra la cota no está "
+                      "acotada.")
+    t = v.copy()
+    t["brecha_z"] = t["brecha_z"].where(t["modelo"] == "paso1", np.nan)
+    t["frac_semillas_optimo"] = t["frac_semillas_optimo"].map(lambda x: f"{x:.1f}").where(
+        t["optimo_probado"], "–")
+    for c in ["brecha_mejor", "brecha_media", "brecha_z", "brecha_vs_incumbente"]:
+        t[c + "_%"] = t[c].map(_pct)
+    t["error_redondeo_max"] = t["error_redondeo_max"].map(lambda e: f"{e:.1e}")
+    t["brecha_z_%"] = t["brecha_z_%"].where(t["modelo"] == "paso1", "–")
+    cols = ["id", "modelo", "formulacion", "n_pos", "existentes", "n_especies_libres", "aristas",
+            "variables", "z_opt", "cota", "optimo_probado", "estado", "tiempo_cpsat_s",
+            "z_ts_mejor", "z_ts_media", "z_ts_sd", "tiempo_ts_medio_s", "brecha_mejor_%",
+            "brecha_media_%", "brecha_vs_incumbente_%", "frac_semillas_optimo", "z_comp_opt",
+            "z_comp_ts_mejor", "brecha_z_%", "error_redondeo_max"]
+    t["n_especies_libres"] = t["n_especies_libres"].map(lambda x: "" if x != x else str(int(x)))
+    partes.append("Tabla completa (`results/validacion_exacta.csv`; en el paso 1 los z son el "
+                  "objetivo γ·Z + Σθ·D, y z_comp es Z; las brechas de la mejor semilla y de la media usan la "
+                  "referencia válida descrita arriba, por lo que pueden diferir ligeramente del "
+                  "CSV; brecha_z sólo se reporta en el paso 1, porque en el paso 3 el CSV la iguala "
+                  "a la brecha contra la cota y no es comparable; – = no aplica):\n\n"
+                  + tabla_md(t[cols]))
+    return "\n\n".join(partes)
+
+
+def _pendiente(o=None):
+    hecha = o is not None and (Path(o) / "validacion_exacta.csv").exists()
+    cpsat = "" if hecha else "- Validación exacta con CP-SAT (§9).\n"
     return ("Lo siguiente de la especificación no se hizo y no tiene salida en `results/`:\n\n"
-            "- Validación exacta con CP-SAT (§9).\n"
+            + cpsat +
             "- Comparación con DSATUR (§10).\n"
             "- Sensibilidades: κ = 0.4 y 0.8, radios × 0.75 y × 1.25, m × 0, 0.5 y 2, y s2.\n"
-            "- Curvas de convergencia de un polígono de 8 ha: los CSV existen "
-            "(`convergencia_map_*.csv`), pero sólo se grafican 1 ha y P1.")
+            "")
 
 
 def _notas():
@@ -238,8 +456,10 @@ def generar(origen):
         "## Paso 2: compra\n\n" + _paso2(origen, cfg),
         "## Paso 3: ajuste al polígono real\n\n" + _paso3(origen),
         "## Práctica actual\n\n" + _practica(origen),
+        "## Convergencia del tabú\n\n" + _convergencia(origen, cfg),
+        "## Validación exacta\n\n" + _validacion(origen),
         "## Notas de interpretación\n\n" + _notas(),
-        "## No incluido / pendiente\n\n" + _pendiente(),
+        "## No incluido / pendiente\n\n" + _pendiente(origen),
         "## Figuras\n\n" + _figuras(),
     ]) + "\n"
 

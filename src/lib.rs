@@ -2,6 +2,7 @@
 
 pub mod algorithm;
 pub mod busqueda_tabu;
+pub mod calibracion;
 pub mod competencia;
 pub mod competition;
 pub mod composicion;
@@ -23,6 +24,7 @@ pub mod reforestation;
 pub mod reportes;
 pub mod tabu;
 pub mod terrain;
+pub mod validacion;
 pub mod writer;
 
 pub use reforestation::{Plant, Polygon, Wasted};

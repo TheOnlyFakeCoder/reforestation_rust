@@ -23,7 +23,7 @@ python -m venv .venv
 | Ruta | Contenido |
 | --- | --- |
 | `src/` | Módulos del modelo en Rust: `config`, `datos`, `malla`, `competencia`, `objetivo`, `composicion`, `busqueda_tabu`, `paso1`, `escenarios`, `paso3`, `practica`, `reportes`; `src/bin/reto.rs` es el CLI |
-| `python/` | `comun.py`, `ajuste.py`, `paso2_compra.py`, `practica_compra.py`, `markov.py`, `figuras.py`, `resumen.py` y `tests/` |
+| `python/` | `comun.py`, `ajuste.py`, `paso2_compra.py`, `practica_compra.py`, `markov.py`, `figuras.py`, `resumen.py`, `validacion_exacta.py` y `tests/` |
 | `config/default.json` | Parámetros compartidos por Rust y Python (γ* = 3, ε = 0.1, π_factor = 2, tabú, semillas) |
 | `data/` | Datos del reto (los escribe `reto datos`) |
 | `results/` | CSV/JSON de cada paso y `RESUMEN.md` |
@@ -47,11 +47,23 @@ $py = ".venv\Scripts\python.exe"
 & $py python\paso2_compra.py
 & $reto paso3 --instancias todas
 & $reto practica --instancias todas
+& $reto instancias-val              # results/validacion/inst_<id>.json
+& $reto tabu-val                    # results/validacion/tabu_<id>.csv (10 semillas)
+& $py python\validacion_exacta.py   # results/validacion_exacta.csv (CP-SAT)
 & $py python\practica_compra.py
 & $py python\markov.py
 & $py python\figuras.py
 & $py python\resumen.py
 ```
+
+`.\run_all.ps1 -OmitirValidacion` salta los tres pasos de la validación exacta. CP-SAT corre
+600 s por instancia con 8 workers en la formulación básica y, si no prueba el óptimo, otros
+600 s con la ajustada (10 instancias: hasta unas 3.5 h). `python\validacion_exacta.py` acepta
+`--tiempo S`, `--workers N`, `--ids p3_a,p1_c`, `--dir`, `--salida` y `--reto`. Antes de comparar
+verifica que Python y `reto evaluar-val` den el mismo Z (1e-6); si no, escribe
+`results/validacion_exacta_discrepancias.txt` y sale con código 2. Para evaluar asignaciones a
+mano: `& $reto evaluar-val --inst results\validacion\inst_p3_a.json --phi CSV` (columna `phi` con
+especies separadas por `;` y −1 para vacía, o una columna `especie` por posición).
 
 ## Cambiar parámetros
 

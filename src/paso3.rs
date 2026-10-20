@@ -5,7 +5,7 @@
 use std::error::Error;
 use std::path::Path;
 
-use crate::busqueda_tabu::{buscar, ParamsTabu, Problema, Restriccion};
+use crate::busqueda_tabu::{buscar, MotivoParo, ParamsTabu, Problema, Restriccion};
 use crate::datos::N_ESPECIES;
 use crate::escenarios::{generar, Escenario, ParamsMc};
 use crate::objetivo::z_total;
@@ -114,6 +114,7 @@ pub struct FilaPaso3 {
     pub z_por_planta: f64,
     pub tiempo_s: f64,
     pub iteraciones: usize,
+    pub motivo_paro: MotivoParo,
 }
 
 /// Resuelve el escenario ω: (fila, φ final con existentes y nuevas).
@@ -156,6 +157,7 @@ pub fn resolver_escenario(
             z_por_planta: if plantas > 0 { z / plantas as f64 } else { 0.0 },
             tiempo_s: r.tiempo_s,
             iteraciones: r.iteraciones,
+            motivo_paro: r.motivo_paro,
         },
         r.phi,
     )

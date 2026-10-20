@@ -182,7 +182,6 @@ fn correr_paso3(
     n_omega: usize,
     existentes_reales: Option<[u32; N_ESPECIES]>,
 ) -> Result<Paso3View, String> {
-    let params: ParamsTabu = config.tabu.params(config.semilla);
     let instancia = Instancia::nueva(
         &nombre,
         area,
@@ -191,6 +190,9 @@ fn correr_paso3(
         config.m_escala,
         config.usar_s2,
     );
+    let params: ParamsTabu = config
+        .tabu
+        .params_para(config.semilla, instancia.malla.len());
     let resultados = Path::new("results");
 
     // φ* del paso 1: del CSV publicado; si no existe, se resuelve aquí.
@@ -298,7 +300,6 @@ fn correr_paso1(
     datos: &Datos,
     config: &Config,
 ) -> Result<Paso1View, String> {
-    let params: ParamsTabu = config.tabu.params(config.semilla);
     let instancia = Instancia::nueva(
         &nombre,
         area,
@@ -307,6 +308,9 @@ fn correr_paso1(
         config.m_escala,
         config.usar_s2,
     );
+    let params: ParamsTabu = config
+        .tabu
+        .params_para(config.semilla, instancia.malla.len());
 
     let mut phi_inicial = patron_serpentina(&instancia.malla, ROW_SEQUENCE, instancia.d_tot);
     reparar_a_banda(&mut phi_inicial, &instancia.banda);

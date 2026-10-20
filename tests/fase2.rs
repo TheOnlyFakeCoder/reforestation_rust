@@ -723,3 +723,60 @@ fn barrido_agrega_gamma_por_3_mientras_d_cambia_en_el_extremo_hasta_3_veces() {
         vec![1.0, 100.0, 300.0]
     );
 }
+
+#[test]
+fn motivo_de_paro_distingue_tope_y_sin_mejora() {
+    use reforestation::busqueda_tabu::{buscar, MotivoParo, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![false; n],
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    let base = ParamsTabu {
+        candidatos: 20,
+        tenure: 5,
+        max_iter: 50,
+        max_sin_mejora: 10_000,
+        prob_intercambio: 1.0,
+        semilla: 1,
+    };
+    let r = buscar(&problema, phi_nominal_barajado(3), &base);
+    assert_eq!(r.motivo_paro, MotivoParo::Tope);
+    assert_eq!(r.motivo_paro.como_str(), "tope");
+    let params = ParamsTabu {
+        max_iter: 100_000,
+        max_sin_mejora: 5,
+        ..base
+    };
+    let r = buscar(&problema, phi_nominal_barajado(3), &params);
+    assert_eq!(r.motivo_paro, MotivoParo::SinMejora);
+    assert_eq!(r.motivo_paro.como_str(), "sin_mejora");
+}
+
+#[test]
+fn con_menos_de_dos_libres_el_paro_es_sin_mejora() {
+    use reforestation::busqueda_tabu::{buscar, MotivoParo, ParamsTabu, Problema, Restriccion};
+    let (grafo, tabla, n) = instancia_1ha();
+    let problema = Problema {
+        grafo: &grafo,
+        tabla: &tabla,
+        fija: vec![true; n],
+        gamma: 1.0,
+        theta: [0.0; 10],
+        restriccion: Restriccion::ComposicionFija,
+    };
+    let params = ParamsTabu {
+        candidatos: 20,
+        tenure: 5,
+        max_iter: 50,
+        max_sin_mejora: 50,
+        prob_intercambio: 1.0,
+        semilla: 1,
+    };
+    let r = buscar(&problema, phi_nominal_barajado(3), &params);
+    assert_eq!(r.motivo_paro, MotivoParo::SinMejora);
+}

@@ -39,6 +39,23 @@ pub struct Problema<'a> {
     pub restriccion: Restriccion,
 }
 
+/// Por qué terminó la búsqueda: llegó al tope de iteraciones o se agotó la paciencia.
+/// Una búsqueda con menos de 2 posiciones libres cuenta como `SinMejora`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MotivoParo {
+    Tope,
+    SinMejora,
+}
+
+impl MotivoParo {
+    pub fn como_str(self) -> &'static str {
+        match self {
+            MotivoParo::Tope => "tope",
+            MotivoParo::SinMejora => "sin_mejora",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Resultado {
     pub phi: Vec<u8>,
@@ -50,6 +67,7 @@ pub struct Resultado {
     /// Mejor objetivo visto hasta cada iteración (curva de convergencia).
     pub curva: Vec<f64>,
     pub tiempo_s: f64,
+    pub motivo_paro: MotivoParo,
 }
 
 impl Problema<'_> {
@@ -180,6 +198,11 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
         }
         curva.push(mejor_objetivo);
     }
+    let motivo_paro = if libres.len() <= 1 || sin_mejora >= params.max_sin_mejora {
+        MotivoParo::SinMejora
+    } else {
+        MotivoParo::Tope
+    };
     Resultado {
         z: z_total(&mejor_phi, problema.grafo, problema.tabla),
         objetivo: problema.objetivo(&mejor_phi),
@@ -188,6 +211,7 @@ pub fn buscar(problema: &Problema, inicial: Vec<u8>, params: &ParamsTabu) -> Res
         traza,
         curva,
         tiempo_s: inicio.elapsed().as_secs_f64(),
+        motivo_paro,
     }
 }
 

@@ -52,16 +52,23 @@ pub struct ConfigTabu {
     pub max_iter: usize,
     pub max_sin_mejora: usize,
     pub prob_intercambio: f64,
+    /// Tope de iteraciones por posición de la malla: max(max_iter, iter_por_posicion·|V|).
+    /// 0 desactiva el escalado.
+    pub iter_por_posicion: usize,
+    /// Paciencia por posición: max(max_sin_mejora, sin_mejora_por_posicion·|V|). 0 = desactivado.
+    pub sin_mejora_por_posicion: usize,
 }
 
 impl Default for ConfigTabu {
     fn default() -> Self {
         ConfigTabu {
-            candidatos: 64,
-            tenure: 15,
+            candidatos: 128,
+            tenure: 10,
             max_iter: 20_000,
             max_sin_mejora: 3_000,
             prob_intercambio: 0.5,
+            iter_por_posicion: 300,
+            sin_mejora_por_posicion: 8,
         }
     }
 }
@@ -76,6 +83,23 @@ impl ConfigTabu {
             max_sin_mejora: self.max_sin_mejora,
             prob_intercambio: self.prob_intercambio,
             semilla,
+        }
+    }
+}
+
+impl ConfigTabu {
+    /// Como `params`, pero con los topes escalados por el tamaño de la malla (`n_posiciones`).
+    pub fn params_para(
+        &self,
+        semilla: u64,
+        n_posiciones: usize,
+    ) -> crate::busqueda_tabu::ParamsTabu {
+        crate::busqueda_tabu::ParamsTabu {
+            max_iter: self.max_iter.max(self.iter_por_posicion * n_posiciones),
+            max_sin_mejora: self
+                .max_sin_mejora
+                .max(self.sin_mejora_por_posicion * n_posiciones),
+            ..self.params(semilla)
         }
     }
 }
@@ -400,5 +424,37 @@ mod tests {
         };
         let error = config.validar().unwrap_err();
         assert!(error.contains("tolerancia"), "{error}");
+    }
+
+    #[test]
+    fn params_para_escala_el_tope_con_el_numero_de_posiciones() {
+        let t = ConfigTabu {
+            iter_por_posicion: 50,
+            sin_mejora_por_posicion: 0,
+            ..ConfigTabu::default()
+        };
+        assert_eq!(t.params_para(1, 1000).max_iter, 50_000);
+        // n = 100: max(20 000, 5 000) = 20 000.
+        assert_eq!(t.params_para(1, 100).max_iter, 20_000);
+        assert_eq!(t.params_para(7, 100).semilla, 7);
+        assert_eq!(t.params_para(1, 100).max_sin_mejora, 3_000);
+        let t2 = ConfigTabu {
+            sin_mejora_por_posicion: 2,
+            ..t.clone()
+        };
+        assert_eq!(t2.params_para(1, 5000).max_sin_mejora, 10_000);
+        assert_eq!(t2.params_para(1, 100).max_sin_mejora, 3_000);
+        // params (legacy) no escala.
+        assert_eq!(t.params(1).max_iter, 20_000);
+    }
+
+    #[test]
+    fn set_tabu_acepta_iter_por_posicion_y_cero_desactiva_el_escalado() {
+        let mut c = Config::default();
+        c.aplicar(r#"tabu={"iter_por_posicion":100}"#).unwrap();
+        assert_eq!(c.tabu.iter_por_posicion, 100);
+        assert_eq!(c.tabu.params_para(1, 1000).max_iter, 100_000);
+        c.aplicar(r#"tabu={"iter_por_posicion":0}"#).unwrap();
+        assert_eq!(c.tabu.params_para(1, 100_000).max_iter, 20_000);
     }
 }

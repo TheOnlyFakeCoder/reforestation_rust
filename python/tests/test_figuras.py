@@ -21,3 +21,11 @@ def test_mapa_sin_patron_se_omite_con_aviso(tmp_path, capsys):
     figuras.main(["mapa"], instancias=["no_existe"], origen=RAIZ / "results", salida=tmp_path)
     assert not (tmp_path / "mapa_no_existe.png").exists()
     assert "no_existe" in capsys.readouterr().out
+
+
+def test_convergencia_incluye_map_21(tmp_path):
+    figuras.main(["convergencia"], origen=RAIZ / "results", salida=tmp_path)
+    for n in ["convergencia_1ha", "convergencia_map_27", "convergencia_map_21"]:
+        assert (tmp_path / f"{n}.png").stat().st_size > 1000
+    figuras.main(["curva_compromiso"], instancias=["1ha"], origen=RAIZ / "results", salida=tmp_path)
+    assert not (tmp_path / "curva_compromiso_map_21.png").exists()

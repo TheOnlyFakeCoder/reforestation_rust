@@ -330,6 +330,13 @@ def _validacion(o):
             + ". En ellas la brecha se mide contra la cota, así que es una cota superior de la "
             "brecha real; para cada instancia se toma la fila de óptimo probado o, si no la hay, "
             "la de mayor cota.")
+        hueco = (no["z_opt"] - no["cota"]) / no["cota"]
+        partes.append(
+            f"En esas filas la incumbente de CP-SAT queda entre {_pct(hueco.min())} % y "
+            f"{_pct(hueco.max())} % por encima de la cota, así que la brecha contra la cota está "
+            "dominada por la debilidad de la cota más que por la calidad de las soluciones. La "
+            "suma de los peores errores de redondeo por término en una solución (tolerancia del "
+            f"modelo escalado) es a lo más {v['tolerancia_redondeo'].max():.3f}.")
     partes.append(
         f"Brecha de la mejor semilla del tabú (contra el óptimo o la cota): máxima "
         f"{_pct(d.loc[i_max, 'brecha_mejor'])} % ({d.loc[i_max, 'id']}), media "
@@ -339,6 +346,15 @@ def _validacion(o):
         f"{_pct(d['brecha_vs_incumbente'].min())} % y {_pct(d['brecha_vs_incumbente'].max())} %"
         + (" (negativa: el tabú quedó mejor que la incumbente de CP-SAT)."
            if (d["brecha_vs_incumbente"] < 0).any() else "."))
+    mejora = d[d["brecha_vs_incumbente"] > 1e-12]
+    partes.append(
+        f"La incumbente de CP-SAT mejora a la mejor semilla del tabú en {len(mejora)} de {n} "
+        "instancias (con los coeficientes originales).")
+    if len(no):
+        partes.append(
+            "Fracción de semillas que alcanzan el valor de la incumbente (|Z_TS − Z*| ≤ "
+            "1e-6·max(1, Z*)) en las instancias sin óptimo probado, contra la incumbente de CP-SAT: "
+            + ", ".join(f"{r.id}: {r.frac_semillas_optimo:.1f}" for r in no.itertuples()) + ".")
     if len(opt):
         partes.append(
             "Fracción de semillas que alcanzan el valor de CP-SAT (|Z_TS − Z*| ≤ 1e-6·max(1, Z*)), "
@@ -359,8 +375,10 @@ def _validacion(o):
                            "fijo, así que la composición queda determinada y Σθ·D es constante: "
                            "esas instancias validan sólo el acomodo.")
     if np.isinf(v["brecha_mejor"]).any():
-        partes.append("∞: la cota de la fila es ≤ 0, así que la brecha relativa contra la cota no "
-                      "está acotada.")
+        inf = v[np.isinf(v["brecha_mejor"])]
+        partes.append("∞ (" + "; ".join(f"{r.id}, {r.formulacion}" for r in inf.itertuples())
+                      + "): la cota es ≤ 0, así que la brecha relativa contra la cota no está "
+                      "acotada.")
     t = v.copy()
     for c in ["brecha_mejor", "brecha_media", "brecha_z", "brecha_vs_incumbente"]:
         t[c + "_%"] = t[c].map(_pct)

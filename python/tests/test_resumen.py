@@ -104,8 +104,14 @@ def test_validacion_exacta_seccion(tmp_path):
     assert "16.9" in t
     assert "brecha_z" in t and "0.5 %" in t
     assert "p1_a: 1" in t
-    assert "∞" in t  # la fila básica de p3_a tiene cota 0
+    assert "∞ (p3_a, basica)" in t  # la fila básica de p3_a tiene cota 0
     assert "CP-SAT" not in resumen._pendiente(tmp_path)
+    # p3_a: la incumbente (34.9) mejora a la mejor semilla (35.07); p1_a y p3_b la igualan
+    assert "mejora a la mejor semilla del tabú en 1 de 3 instancias" in t
+    # (incumbente − cota)/cota de p3_a con la fila ajustada: (34.9 − 30)/30 = 16.3 %
+    assert "entre 16.3 % y 16.3 %" in t
+    assert "contra la incumbente de CP-SAT: p3_a: 0.0" in t
+    assert "tolerancia" in t
 
 
 def test_validacion_exacta_sin_csv(tmp_path):

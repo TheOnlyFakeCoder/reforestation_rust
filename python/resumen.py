@@ -279,6 +279,16 @@ def _pct(v):
     return f"{p:.1e}" if abs(p) < 1e-3 else f"{p:.3g}"
 
 
+def brechas_vs_cota_valida(v):
+    """Brechas de la mejor semilla y de la media contra la referencia válida para los coeficientes
+    originales: Z* si el óptimo está probado; si no, cota − tolerancia_redondeo (∞ si es ≤ 0)."""
+    ref = v["z_opt"].where(v["optimo_probado"], v["cota"] - v["tolerancia_redondeo"])
+    out = {}
+    for c, z in (("brecha_mejor", "z_ts_mejor"), ("brecha_media", "z_ts_media")):
+        out[c] = ((v[z] - ref) / ref).where(ref > 0, np.inf)
+    return v.assign(**out)
+
+
 def validacion_definitiva(v):
     """Una fila por instancia: la de óptimo probado si la hay; si no, la de mayor cota."""
     v = v.assign(_o=~v["optimo_probado"].astype(bool), _c=-v["cota"])
@@ -294,6 +304,7 @@ def _validacion(o):
                 "`results/validacion/` de `reto instancias-val` y `reto tabu-val`).")
     v = pd.read_csv(ruta)
     v["optimo_probado"] = v["optimo_probado"].astype(bool)
+    v = brechas_vs_cota_valida(v)
     d = validacion_definitiva(v)
     n = len(d)
     opt = d[d["optimo_probado"]]
@@ -307,17 +318,20 @@ def _validacion(o):
     de_semillas = f" (de {', '.join(map(str, semillas))} semillas)" if semillas else ""
     hay_ajustada = (v["formulacion"] == "ajustada").any()
     partes = [
-        f"CP-SAT (OR-Tools) resolvió {n} instancias pequeñas ({n3} del paso 3, ec. 24, y {n1} del "
-        f"paso 1, ec. 21) con un límite de {tl} s y {wk} workers por formulación. En las "
+        f"Se corrió CP-SAT (OR-Tools) sobre {n} instancias pequeñas ({n3} del paso 3, ec. 24, y {n1} "
+        f"del paso 1, ec. 21) con un límite de {tl} s y {wk} workers por formulación"
+        + (f"; ninguna se probó óptima en ese tiempo" if len(opt) == 0 else "") + ". En las "
         f"{len(v)} corridas CP-SAT arrancó con la mejor solución del tabú{de_semillas} como hint "
         "(`AddHint`). "
         + ("Primero se corrió la formulación básica y, donde no cerró, también la ajustada; la "
            "tabla tiene ambas filas. " if hay_ajustada else "Se usó la formulación básica. ")
-        + "Los coeficientes del modelo son "
-        "round(γ·w·h·10 000) y round(θ·10 000); Z*, Z_TS y las brechas usan los coeficientes "
+        + "Los coeficientes enteros del modelo son round(γ·w·h·10 000) para los pares libre–libre; "
+        "para los términos libre–fijo, el agregado por (v, j), (θ_j + γ·Σ w·h), redondeado una "
+        "sola vez; y θ·10 000 en el paso 1. Z*, Z_TS y las brechas usan los coeficientes "
         f"originales (error de redondeo máximo por coeficiente: {v['error_redondeo_max'].max():.1e}). "
-        "Antes de comparar se verificó que el Z de Python de cada solución del tabú y de cada "
-        "solución de CP-SAT coincide con el de Rust (`reto evaluar-val`) a 1e-6.",
+        "Antes de comparar, el Z/objetivo de Python de cada solución del tabú se verificó contra "
+        "el reportado por `tabu-val` de Rust, y el de cada solución de CP-SAT se reevaluó con "
+        "`reto evaluar-val`; ambos coinciden a 1e-6.",
         f"Óptimo probado en {len(opt)} de {n} instancias ({por_form['basica']} con la formulación "
         f"básica y {por_form['ajustada']} con la ajustada)"
         + (f": {', '.join(opt['id'])}." if len(opt) else "."),
@@ -327,7 +341,8 @@ def _validacion(o):
             "Sin óptimo probado: " + ", ".join(
                 f"{r.id} (cota {r.cota:.4f}, incumbente {r.z_opt:.4f}, {r.formulacion})"
                 for r in no.itertuples())
-            + ". En ellas la brecha se mide contra la cota, así que es una cota superior de la "
+            + ". En ellas la brecha se mide contra la cota − tolerancia de redondeo (cota válida "
+            "para el problema con coeficientes originales), así que es una cota superior de la "
             "brecha real; para cada instancia se toma la fila de óptimo probado o, si no la hay, "
             "la de mayor cota.")
         hueco = (no["z_opt"] - no["cota"]) / no["cota"]
@@ -354,7 +369,10 @@ def _validacion(o):
         partes.append(
             "Fracción de semillas que alcanzan el valor de la incumbente (|Z_TS − Z*| ≤ "
             "1e-6·max(1, Z*)) en las instancias sin óptimo probado, contra la incumbente de CP-SAT: "
-            + ", ".join(f"{r.id}: {r.frac_semillas_optimo:.1f}" for r in no.itertuples()) + ".")
+            + ", ".join(f"{r.id}: {r.frac_semillas_optimo:.1f}" for r in no.itertuples()) + ". "
+            "En la tabla esta fracción sólo se muestra con óptimo probado (– si no): sin él no es "
+            "significativa, porque en las filas básicas la incumbente puede ser la propia solución "
+            "del hint del tabú.")
     if len(opt):
         partes.append(
             "Fracción de semillas que alcanzan el valor de CP-SAT (|Z_TS − Z*| ≤ 1e-6·max(1, Z*)), "
@@ -364,7 +382,7 @@ def _validacion(o):
     if len(p1):
         partes.append(
             "Paso 1: brecha_z = (γ·Z_TS − γ·Z*)/(γ·Z*), la competencia de la mejor semilla contra "
-            "la de la solución de CP-SAT: "
+            "la de la incumbente de CP-SAT (no contra el óptimo): "
             + ", ".join(f"{r.id}: {_pct(r.brecha_z)} %" for r in p1.itertuples())
             + ". Especies con L_j < U_j (n_especies_libres): "
             + ", ".join(f"{r.id}: {int(r.n_especies_libres)}" for r in p1.itertuples())
@@ -380,9 +398,13 @@ def _validacion(o):
                       + "): la cota es ≤ 0, así que la brecha relativa contra la cota no está "
                       "acotada.")
     t = v.copy()
+    t["brecha_z"] = t["brecha_z"].where(t["modelo"] == "paso1", np.nan)
+    t["frac_semillas_optimo"] = t["frac_semillas_optimo"].map(lambda x: f"{x:.1f}").where(
+        t["optimo_probado"], "–")
     for c in ["brecha_mejor", "brecha_media", "brecha_z", "brecha_vs_incumbente"]:
         t[c + "_%"] = t[c].map(_pct)
     t["error_redondeo_max"] = t["error_redondeo_max"].map(lambda e: f"{e:.1e}")
+    t["brecha_z_%"] = t["brecha_z_%"].where(t["modelo"] == "paso1", "–")
     cols = ["id", "modelo", "formulacion", "n_pos", "existentes", "n_especies_libres", "aristas",
             "variables", "z_opt", "cota", "optimo_probado", "estado", "tiempo_cpsat_s",
             "z_ts_mejor", "z_ts_media", "z_ts_sd", "tiempo_ts_medio_s", "brecha_mejor_%",
@@ -390,7 +412,11 @@ def _validacion(o):
             "z_comp_ts_mejor", "brecha_z_%", "error_redondeo_max"]
     t["n_especies_libres"] = t["n_especies_libres"].map(lambda x: "" if x != x else str(int(x)))
     partes.append("Tabla completa (`results/validacion_exacta.csv`; en el paso 1 los z son el "
-                  "objetivo γ·Z + Σθ·D, y z_comp es Z):\n\n" + tabla_md(t[cols]))
+                  "objetivo γ·Z + Σθ·D, y z_comp es Z; las brechas de la mejor semilla y de la media usan la "
+                  "referencia válida descrita arriba, por lo que pueden diferir ligeramente del "
+                  "CSV; brecha_z sólo se reporta en el paso 1, porque en el paso 3 el CSV la iguala "
+                  "a la brecha contra la cota y no es comparable; – = no aplica):\n\n"
+                  + tabla_md(t[cols]))
     return "\n\n".join(partes)
 
 

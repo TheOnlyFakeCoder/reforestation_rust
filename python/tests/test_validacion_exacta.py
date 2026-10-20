@@ -143,6 +143,7 @@ def test_cpsat_igual_a_fuerza_bruta(brutos, caso, formulacion):
     assert r["objetivo"] == pytest.approx(ve.objetivo_python(inst, r["phi"]), abs=1e-12)
     assert r["z"] == pytest.approx(ve.z_python(inst, r["phi"]), abs=1e-12)
     assert r["cota"] <= r["objetivo"] + r["tolerancia_redondeo"] + 1e-12
+    assert r["cota"] == pytest.approx(z_bruto, abs=r["tolerancia_redondeo"] + 1e-9)
 
 
 def test_existente_existente_entra_como_constante(brutos):

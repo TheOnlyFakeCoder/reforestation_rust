@@ -1,4 +1,6 @@
 # Pipeline completo del Entregable 2 (ver README.md). Ejecutar desde la raíz del repositorio.
+# -OmitirValidacion salta la validación exacta con CP-SAT (hasta ~10 min por instancia y formulación).
+param([switch]$OmitirValidacion)
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
@@ -26,6 +28,11 @@ Invoke-Paso $reto @('montecarlo', '--instancias', 'todas')
 Invoke-Paso $py @('python\paso2_compra.py')
 Invoke-Paso $reto @('paso3', '--instancias', 'todas')
 Invoke-Paso $reto @('practica', '--instancias', 'todas')
+if (-not $OmitirValidacion) {
+    Invoke-Paso $reto @('instancias-val')
+    Invoke-Paso $reto @('tabu-val')
+    Invoke-Paso $py @('python\validacion_exacta.py')
+}
 Invoke-Paso $py @('python\practica_compra.py')
 Invoke-Paso $py @('python\markov.py')
 Invoke-Paso $py @('python\figuras.py')

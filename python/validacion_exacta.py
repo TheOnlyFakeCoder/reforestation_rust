@@ -41,7 +41,7 @@ COLUMNAS = [
     "z_comp_opt", "z_comp_ts_mejor", "brecha_z", "error_redondeo_max",
     # añadidas al final: estado de CP-SAT, cota del error total de redondeo de una solución
     # (Σ por término del mayor error) y brecha de la mejor semilla contra la incumbente.
-    "estado", "tolerancia_redondeo", "brecha_vs_incumbente",
+    "estado", "tolerancia_redondeo", "brecha_vs_incumbente", "tiempo_limite_s", "workers",
 ]
 
 
@@ -276,6 +276,8 @@ def resolver(inst, tiempo=600, workers=8, formulacion="basica", hint=None, escal
         "tolerancia_redondeo": mod.tolerancia_redondeo,
         "formulacion": formulacion,
         "hint": mod.hint,
+        "tiempo_limite": float(tiempo),
+        "workers": int(workers),
     }
 
 
@@ -322,6 +324,7 @@ def fila_resultado(inst, tabu, r):
         "error_redondeo_max": r["error_redondeo_max"], "estado": r["estado"],
         "tolerancia_redondeo": r["tolerancia_redondeo"],
         "brecha_vs_incumbente": brecha(float(obj.min()), z_opt),
+        "tiempo_limite_s": r["tiempo_limite"], "workers": r["workers"],
     }
 
 
@@ -434,6 +437,9 @@ def validar(dir_val, salida, tiempo=600, workers=8, reto=RETO, ids=None):
 
 
 def main(argv=None):
+    for flujo in (sys.stdout, sys.stderr):  # la consola de Windows (cp1252) no tiene ↔ ni ≠
+        if hasattr(flujo, "reconfigure"):
+            flujo.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--dir", default=str(RAIZ / "results" / "validacion"))
     ap.add_argument("--salida", default=str(RAIZ / "results" / "validacion_exacta.csv"))

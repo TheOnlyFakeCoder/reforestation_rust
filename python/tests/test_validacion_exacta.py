@@ -391,3 +391,18 @@ def test_validar_corre_ajustada_solo_si_basica_no_cierra(tmp_path):
     assert bool(df["optimo_probado"].iloc[0])
     assert not bool(df["optimo_probado"].iloc[1])
     assert df["hint"].all()
+    assert (df["tiempo_limite_s"] == 0.3).all() and (df["workers"] == 2).all()
+
+
+def test_main_escribe_en_consola_no_utf8(tmp_path, monkeypatch):
+    import io
+    import sys
+    chica = CASOS["paso3_con_huecos"]()
+    d = _carpeta(tmp_path, chica, _tabu_falso(chica), "a_chica")
+    crudo = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(crudo, encoding="cp1252"))
+    codigo = ve.main(["--dir", str(d), "--salida", str(tmp_path / "v.csv"), "--tiempo", "5",
+                      "--workers", "2", "--reto", str(RETO)])
+    sys.stdout.flush()
+    assert codigo == 0
+    assert "Rust" in crudo.getvalue().decode("utf-8")

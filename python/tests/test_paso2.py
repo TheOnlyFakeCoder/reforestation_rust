@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from paso2_compra import (cargar_instancia, escenarios_C, resolver_ple,
+from paso2_compra import (cargar_instancia, escenarios_C, modelo_ple, resolver_ple,
                           voceador, metricas)
 
 RNG = np.random.default_rng(1)
@@ -74,3 +74,17 @@ def test_csv_salida_con_a_lo_mas_6_decimales(tmp_path):
             if "." in v:
                 assert len(v.split(".")[1]) <= 6
     assert df["q_0"].str.fullmatch(r"\d+").all()
+
+
+def test_modelo_ple_igual_a_resolver():
+    import pulp
+    from paso2_compra import _solver
+    D, X = sintetico(51)
+    C = escenarios_C(D, X)
+    prob, q = modelo_ple(C, C_COSTO, 4, presupuesto=5000.0)
+    assert len(q) == 10
+    prob.solve(_solver())
+    qm = np.array([int(round(v.value())) for v in q])
+    qr, obj = resolver_ple(C, C_COSTO, 4, presupuesto=5000.0)
+    assert (qm == qr).all()
+    assert abs(float(pulp.value(prob.objective)) - obj) < 1e-9

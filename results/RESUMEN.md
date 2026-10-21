@@ -446,13 +446,13 @@ Markov. Titular: las filas `compra_d` (compra del paso 2, ε = 0.1) y `compra_no
 
 | instancia | base | composicion | plantas | vivas_1ano | vivas_2anos | reposicion_esperada |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1ha | compra_d | D* | 516.269 | 471.8365 | 446.8145 | 74.7092 |
+| 1ha | compra_d | D* | 516.269 | 471.9109 | 446.9964 | 74.5156 |
 | 1ha | compra_nominal | Dnom | 528.533 | 483.4413 | 457.2508 | 76.5748 |
-| 1ha | D_completo | D* | 658 | 601.4994 | 569.3122 | 95.3474 |
+| 1ha | D_completo | D* | 658 | 601.5738 | 569.4941 | 95.1538 |
 | 1ha | D_completo | Dnom | 658 | 601.9532 | 569.2745 | 95.2901 |
-| map_27 | compra_d | D* | 662.863 | 605.6788 | 573.46 | 96.1786 |
+| map_27 | compra_d | D* | 662.863 | 605.7462 | 573.6475 | 95.98 |
 | map_27 | compra_nominal | Dnom | 676.668 | 618.9554 | 585.4385 | 98.0044 |
-| map_27 | D_completo | D* | 842 | 769.562 | 728.338 | 122.2138 |
+| map_27 | D_completo | D* | 842 | 769.6294 | 728.5255 | 122.0152 |
 | map_27 | D_completo | Dnom | 842 | 770.2886 | 728.5032 | 121.8973 |
 
 ## Convergencia del tabú

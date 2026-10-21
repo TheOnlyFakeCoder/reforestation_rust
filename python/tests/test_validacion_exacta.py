@@ -395,6 +395,43 @@ def test_validar_corre_ajustada_solo_si_basica_no_cierra(tmp_path):
     assert (df["tiempo_limite_s"] == 0.3).all() and (df["workers"] == 2).all()
 
 
+@pytest.mark.skipif(not RETO.exists(), reason="falta target/release/reto.exe")
+def test_validar_solo_ajustada_actualiza_filas_del_csv(tmp_path):
+    chica = CASOS["paso3_con_huecos"]()
+    grande = _grande()
+    d = _carpeta(tmp_path, chica, _tabu_falso(chica), "a_chica")
+    _carpeta(tmp_path, grande, _tabu_falso(grande), "b_grande")
+    salida = tmp_path / "v.csv"
+    assert ve.validar(d, salida, tiempo=0.3, workers=2, reto=RETO) == 0
+    codigo = ve.validar(d, salida, tiempo=0.4, workers=3, reto=RETO, ids=["b_grande"],
+                        formulaciones=("ajustada",), actualizar=True)
+    assert codigo == 0
+    df = pd.read_csv(salida)
+    assert list(df.columns) == ve.COLUMNAS
+    assert list(zip(df["id"], df["formulacion"], df["workers"], df["tiempo_limite_s"])) == [
+        ("a_chica", "basica", 2, 0.3), ("b_grande", "basica", 2, 0.3),
+        ("b_grande", "ajustada", 3, 0.4)]
+
+
+@pytest.mark.skipif(not RETO.exists(), reason="falta target/release/reto.exe")
+def test_validar_solo_ajustada_sin_actualizar_reescribe(tmp_path):
+    chica = CASOS["paso3_con_huecos"]()
+    d = _carpeta(tmp_path, chica, _tabu_falso(chica), "a_chica")
+    salida = tmp_path / "v.csv"
+    assert ve.validar(d, salida, tiempo=0.3, workers=2, reto=RETO,
+                      formulaciones=("ajustada",)) == 0
+    df = pd.read_csv(salida)
+    assert list(zip(df["id"], df["formulacion"])) == [("a_chica", "ajustada")]
+
+
+def test_workers_por_defecto_son_todos_los_hilos():
+    import os
+    assert ve.WORKERS == (os.cpu_count() or 8)
+    ap = ve.argumentos()
+    a = ap.parse_args([])
+    assert a.workers == ve.WORKERS and a.formulaciones == "basica,ajustada" and not a.actualizar
+
+
 def test_main_escribe_en_consola_no_utf8(tmp_path, monkeypatch):
     import io
     import sys

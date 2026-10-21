@@ -434,7 +434,14 @@ fn montecarlo_escribe_escenarios_y_resumenes() {
     )
     .unwrap();
     let mut args = comunes("montecarlo");
-    args.extend(["--set", "n_escenarios=20"]);
+    args.extend([
+        "--set",
+        "n_escenarios=20",
+        "--set",
+        "n_escenarios_paso3=20",
+        "--set",
+        "escenarios_paso3_por_instancia={}",
+    ]);
     let salida = reto(&args);
     assert!(
         salida.status.success(),
@@ -494,7 +501,12 @@ fn paso3_y_practica_escriben_el_motivo_de_paro() {
     )
     .unwrap();
     let mut args = comunes("paso3");
-    args.extend(["--set", "n_escenarios_paso3=4"]);
+    args.extend([
+        "--set",
+        "n_escenarios_paso3=4",
+        "--set",
+        "escenarios_paso3_por_instancia={}",
+    ]);
     let salida = reto(&args);
     assert!(
         salida.status.success(),
@@ -502,12 +514,24 @@ fn paso3_y_practica_escriben_el_motivo_de_paro() {
         String::from_utf8_lossy(&salida.stderr)
     );
     let esc = encabezado_de(&resultados, "paso3_escenarios.csv");
-    assert!(esc.ends_with(",iteraciones,motivo_paro"), "{esc}");
+    assert!(esc.contains(",iteraciones,motivo_paro,Z_nivel1,"), "{esc}");
+    assert!(esc.ends_with(",Z_nivel5,Z_otro"), "{esc}");
     let texto = std::fs::read_to_string(resultados.join("paso3_escenarios.csv")).unwrap();
     for linea in texto.lines().skip(1) {
-        let motivo = linea.rsplit(',').next().unwrap();
+        let campos: Vec<&str> = linea.split(',').collect();
+        let motivo = campos[campos.len() - 7];
         assert!(["tope", "sin_mejora"].contains(&motivo), "{linea}");
+        let z: f64 = campos[7].parse().unwrap();
+        let niveles: f64 = campos[campos.len() - 6..]
+            .iter()
+            .map(|c| c.parse::<f64>().unwrap())
+            .sum();
+        assert!((z - niveles).abs() < 1e-6, "{linea}");
     }
+    let trans = std::fs::read_to_string(resultados.join("paso3_transicion_1ha.csv")).unwrap();
+    assert_eq!(trans.lines().count(), 201);
+    let plantas = std::fs::read_to_string(resultados.join("paso3_plantas_1ha.csv")).unwrap();
+    assert_eq!(plantas.lines().count(), 11);
     let res = encabezado_de(&resultados, "paso3_resumen.csv");
     assert!(res.ends_with(",paros_tope,paros_sin_mejora"), "{res}");
     let texto = std::fs::read_to_string(resultados.join("paso3_resumen.csv")).unwrap();
@@ -540,6 +564,25 @@ fn paso3_y_practica_escriben_el_motivo_de_paro() {
             assert_eq!(motivo, "", "{linea}");
         }
     }
+    let plantas = |v: &str| -> String {
+        texto
+            .lines()
+            .find(|l| l.split(',').nth(1) == Some(v))
+            .unwrap_or_else(|| panic!("falta la variante {v}"))
+            .split(',')
+            .nth(2)
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(texto.lines().skip(1).count(), 7);
+    assert_eq!(
+        plantas("dsatur_con_existentes"),
+        plantas("tabu_con_existentes")
+    );
+    assert_eq!(
+        plantas("dsatur_sin_existentes"),
+        plantas("tabu_sin_existentes")
+    );
 }
 
 #[test]
@@ -579,4 +622,68 @@ fn calibrar_escribe_el_csv_con_el_encabezado_exacto() {
     let texto = std::fs::read_to_string(resultados.join("calibracion_tabu.csv")).unwrap();
     assert_eq!(texto.lines().count(), 3);
     assert!(String::from_utf8_lossy(&salida.stdout).contains("elegida"));
+}
+
+#[test]
+fn paso3_usa_los_escenarios_por_instancia() {
+    let datos = dir_temporal("por_inst_datos");
+    let resultados = dir_temporal("por_inst_resultados");
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
+    let comunes = |sub: &'static str| {
+        vec![
+            sub,
+            "--datos",
+            datos.to_str().unwrap(),
+            "--resultados",
+            resultados.to_str().unwrap(),
+            "--instancias",
+            "1ha",
+            "--set",
+            TABU_CORTO,
+        ]
+    };
+    let mut args = comunes("paso1");
+    args.extend(["--solo-gamma-star", "--set", "n_semillas=1"]);
+    assert!(reto(&args).status.success());
+    std::fs::write(
+        resultados.join("mc_params.json"),
+        r#"{"mu":129.0,"sigma":3.3,"p_hat":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]}"#,
+    )
+    .unwrap();
+    let q: Vec<String> = [42, 196, 42, 42, 49, 38, 73, 64, 86, 26]
+        .iter()
+        .map(|x| x.to_string())
+        .collect();
+    let cabecera: String = (0..10).map(|j| format!(",q_{j}")).collect();
+    std::fs::write(
+        resultados.join("paso2_compra.csv"),
+        format!(
+            "instancia,epsilon,pi_factor{cabecera}
+1ha,0.1,2.0,{}
+",
+            q.join(",")
+        ),
+    )
+    .unwrap();
+    let mut args = comunes("paso3");
+    args.extend([
+        "--set",
+        "n_escenarios=20",
+        "--set",
+        "n_escenarios_paso3=5",
+        "--set",
+        r#"escenarios_paso3_por_instancia={"1ha":12}"#,
+    ]);
+    let salida = reto(&args);
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
+    let texto = std::fs::read_to_string(resultados.join("paso3_resumen.csv")).unwrap();
+    let campos: Vec<&str> = texto.lines().nth(1).unwrap().split(',').collect();
+    assert_eq!(campos[0], "1ha");
+    assert_eq!(campos[2], "12", "{texto}");
 }

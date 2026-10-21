@@ -16,6 +16,7 @@ CP-SAT y escribe `results/validacion_exacta.csv`.
 import argparse
 import json
 import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,7 @@ ESCALA = 10_000
 TOL_CONSISTENCIA = 1e-6
 N_ESPECIES = 10
 RETO = RAIZ / "target" / "release" / "reto.exe"
+WORKERS = os.cpu_count() or 8  # todos los hilos lógicos (CP-SAT reparte su portafolio entre ellos)
 COLUMNAS = [
     "id", "modelo", "formulacion", "hint", "n_pos", "existentes", "n_especies_libres", "aristas",
     "variables", "z_opt", "cota", "optimo_probado", "tiempo_cpsat_s", "z_ts_mejor", "z_ts_media",
@@ -394,9 +396,12 @@ def _discrepancias(salida, d):
 
 # ---------------------------------------------------------------- flujo completo
 
-def validar(dir_val, salida, tiempo=600, workers=8, reto=RETO, ids=None):
-    """Corre CP-SAT (básica; ajustada además si la básica no cierra) en cada instancia y escribe
-    `salida` tras cada fila. Devuelve 0, o 2 si falla la consistencia Rust↔Python."""
+def validar(dir_val, salida, tiempo=600, workers=8, reto=RETO, ids=None,
+            formulaciones=("basica", "ajustada"), actualizar=False):
+    """Corre CP-SAT en cada instancia con las `formulaciones` en orden (la siguiente sólo si la
+    anterior no cierra) y escribe `salida` tras cada fila. Con `actualizar`, conserva las filas
+    de `salida` cuyo (id, formulación) no se vuelve a correr. Devuelve 0, o 2 si falla la
+    consistencia Rust↔Python."""
     dir_val = Path(dir_val)
     rutas = sorted(dir_val.glob("inst_*.json"))
     if ids:
@@ -415,18 +420,29 @@ def validar(dir_val, salida, tiempo=600, workers=8, reto=RETO, ids=None):
     print(f"consistencia tabú Rust↔Python: {sum(len(t) for _, _, t in datos)} soluciones OK",
           flush=True)
     filas = []
+    previas = []
+    if actualizar and Path(salida).exists():
+        previas = pd.read_csv(salida).to_dict("records")
+    orden = {"basica": 0, "ajustada": 1}
+
+    def escribir():
+        nuevas = {(f["id"], f["formulacion"]) for f in filas}
+        todas = [f for f in previas if (f["id"], f["formulacion"]) not in nuevas] + filas
+        todas.sort(key=lambda f: (str(f["id"]), orden.get(f["formulacion"], 2)))
+        escribir_csv(todas, salida)
+
     with tempfile.TemporaryDirectory() as tmp:
         for ruta, inst, tabu in datos:
             hint = leer_phi(tabu.loc[tabu["objetivo"].idxmin(), "phi"])
-            for formulacion in ("basica", "ajustada"):
+            for formulacion in formulaciones:
                 r = resolver(inst, tiempo=tiempo, workers=workers, formulacion=formulacion, hint=hint)
                 if r["phi"] is not None:
                     d = verificar_cpsat(inst, ruta, r, reto, tmp)
                     if d:
-                        escribir_csv(filas, salida)
+                        escribir()
                         return _discrepancias(salida, d)
                 filas.append(fila_resultado(inst, tabu, r))
-                escribir_csv(filas, salida)
+                escribir()
                 f = filas[-1]
                 print(f"{inst['id']} {formulacion}: {r['estado']} z_opt={f['z_opt']:.9g} "
                       f"cota={f['cota']:.9g} t={r['tiempo']:.1f}s z_ts_mejor={f['z_ts_mejor']:.9g} "
@@ -436,20 +452,30 @@ def validar(dir_val, salida, tiempo=600, workers=8, reto=RETO, ids=None):
     return 0
 
 
-def main(argv=None):
-    for flujo in (sys.stdout, sys.stderr):  # la consola de Windows (cp1252) no tiene ↔ ni ≠
-        if hasattr(flujo, "reconfigure"):
-            flujo.reconfigure(encoding="utf-8")
+def argumentos():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--dir", default=str(RAIZ / "results" / "validacion"))
     ap.add_argument("--salida", default=str(RAIZ / "results" / "validacion_exacta.csv"))
     ap.add_argument("--tiempo", type=float, default=600.0, help="segundos de CP-SAT por instancia")
-    ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--workers", type=int, default=WORKERS,
+                    help="hilos de CP-SAT (por defecto todos los lógicos)")
     ap.add_argument("--reto", default=str(RETO))
     ap.add_argument("--ids", help="ids separados por comas (por defecto todas)")
-    a = ap.parse_args(argv)
+    ap.add_argument("--formulaciones", default="basica,ajustada",
+                    help="en orden; la siguiente sólo si la anterior no cierra")
+    ap.add_argument("--actualizar", action="store_true",
+                    help="conserva las filas de --salida que no se vuelven a correr")
+    return ap
+
+
+def main(argv=None):
+    for flujo in (sys.stdout, sys.stderr):  # la consola de Windows (cp1252) no tiene ↔ ni ≠
+        if hasattr(flujo, "reconfigure"):
+            flujo.reconfigure(encoding="utf-8")
+    a = argumentos().parse_args(argv)
     ids = a.ids.split(",") if a.ids else None
-    return validar(a.dir, a.salida, tiempo=a.tiempo, workers=a.workers, reto=a.reto, ids=ids)
+    return validar(a.dir, a.salida, tiempo=a.tiempo, workers=a.workers, reto=a.reto, ids=ids,
+                   formulaciones=tuple(a.formulaciones.split(",")), actualizar=a.actualizar)
 
 
 if __name__ == "__main__":

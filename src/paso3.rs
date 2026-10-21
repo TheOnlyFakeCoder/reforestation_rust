@@ -6,10 +6,12 @@ use std::error::Error;
 use std::path::Path;
 
 use crate::busqueda_tabu::{buscar, MotivoParo, ParamsTabu, Problema, Restriccion};
-use crate::datos::N_ESPECIES;
+use crate::datos::{Especie, N_ESPECIES};
 use crate::escenarios::{generar, Escenario, ParamsMc};
 use crate::objetivo::z_total;
 use crate::paso1::Instancia;
+use crate::practica::desglose;
+use crate::transicion::{conteos, Conteos};
 
 /// Probabilidad de intercambio con `Restriccion::Cuotas`: sobre todo intercambios (spec §8).
 pub const PROB_INTERCAMBIO_CUOTAS: f64 = 0.8;
@@ -174,13 +176,12 @@ pub struct EntradaPaso3<'a> {
     pub semilla: u64,
 }
 
-/// Corre ω = 0..n_omega repartidos en hilos; el resultado no depende del número de hilos.
-/// Devuelve las filas, el φ final y el escenario del ω = 0.
-pub fn correr_instancia(
+/// Resuelve ω = 0..n_omega repartidos en hilos; el resultado no depende del número de hilos.
+fn resolver_omegas(
     entrada: &EntradaPaso3,
     n_omega: usize,
     params: &ParamsTabu,
-) -> (Vec<FilaPaso3>, Vec<u8>, Escenario) {
+) -> Vec<(FilaPaso3, Vec<u8>)> {
     let inst = entrada.instancia;
     let hilos = std::thread::available_parallelism()
         .map_or(1, |n| n.get())
@@ -192,14 +193,7 @@ pub fn correr_instancia(
             s.spawn(move || {
                 for (i, hueco) in parte.iter_mut().enumerate() {
                     let omega = k * trozo + i;
-                    let e = generar(
-                        inst.malla.len(),
-                        inst.area,
-                        inst.map_id,
-                        omega,
-                        entrada.semilla,
-                        entrada.mc,
-                    );
+                    let e = escenario_de(entrada, omega);
                     let p = ParamsTabu {
                         semilla: entrada.semilla.wrapping_add(omega as u64),
                         ..*params
@@ -216,24 +210,95 @@ pub fn correr_instancia(
             });
         }
     });
+    salida
+        .into_iter()
+        .map(|h| h.expect("cada escenario se resuelve"))
+        .collect()
+}
+
+fn escenario_de(entrada: &EntradaPaso3, omega: usize) -> Escenario {
+    let inst = entrada.instancia;
+    generar(
+        inst.malla.len(),
+        inst.area,
+        inst.map_id,
+        omega,
+        entrada.semilla,
+        entrada.mc,
+    )
+}
+
+/// Corre ω = 0..n_omega repartidos en hilos; el resultado no depende del número de hilos.
+/// Devuelve las filas, el φ final y el escenario del ω = 0.
+pub fn correr_instancia(
+    entrada: &EntradaPaso3,
+    n_omega: usize,
+    params: &ParamsTabu,
+) -> (Vec<FilaPaso3>, Vec<u8>, Escenario) {
     let mut filas = Vec::with_capacity(n_omega);
     let mut phi0 = Vec::new();
-    for (omega, h) in salida.into_iter().enumerate() {
-        let (fila, phi) = h.expect("cada escenario se resuelve");
+    for (omega, (fila, phi)) in resolver_omegas(entrada, n_omega, params)
+        .into_iter()
+        .enumerate()
+    {
         if omega == 0 {
             phi0 = phi;
         }
         filas.push(fila);
     }
-    let e0 = generar(
-        inst.malla.len(),
-        inst.area,
-        inst.map_id,
-        0,
-        entrada.semilla,
-        entrada.mc,
-    );
-    (filas, phi0, e0)
+    (filas, phi0, escenario_de(entrada, 0))
+}
+
+/// Salida de `correr_instancia_detalle`.
+pub struct SalidaPaso3 {
+    pub filas: Vec<FilaPaso3>,
+    pub phi0: Vec<u8>,
+    pub e0: Escenario,
+    /// Z por nivel de competencia (1–5 y "otro") del φ final de cada ω.
+    pub niveles: Vec<[f64; 6]>,
+    /// Transiciones sumadas sobre todos los ω (sólo con `con_transicion`).
+    pub conteos: Option<Conteos>,
+}
+
+/// Como `correr_instancia` (mismo reparto en hilos y semillas), más Z por nivel de cada ω y,
+/// si `con_transicion`, los conteos de transición sumados sobre todos los ω.
+pub fn correr_instancia_detalle(
+    entrada: &EntradaPaso3,
+    n_omega: usize,
+    params: &ParamsTabu,
+    especies: &[Especie],
+    w: &[Vec<f64>],
+    con_transicion: bool,
+) -> SalidaPaso3 {
+    let inst = entrada.instancia;
+    let mut filas = Vec::with_capacity(n_omega);
+    let mut niveles = Vec::with_capacity(n_omega);
+    let mut phi0 = Vec::new();
+    let mut total = con_transicion.then(Conteos::default);
+    for (omega, (fila, phi)) in resolver_omegas(entrada, n_omega, params)
+        .into_iter()
+        .enumerate()
+    {
+        niveles.push(desglose(&phi, &inst.grafo, &inst.tabla, especies, w).niveles);
+        if let Some(total) = total.as_mut() {
+            let mut existente = vec![false; phi.len()];
+            for &(u, _) in &escenario_de(entrada, omega).posiciones {
+                existente[u] = true;
+            }
+            total.sumar(&conteos(&inst.malla, &inst.grafo, &phi, &existente));
+        }
+        if omega == 0 {
+            phi0 = phi;
+        }
+        filas.push(fila);
+    }
+    SalidaPaso3 {
+        filas,
+        phi0,
+        e0: escenario_de(entrada, 0),
+        niveles,
+        conteos: total,
+    }
 }
 
 /// φ de cada posición de `paso1_patron_<inst>.csv` (especie −1 = vacía → φ = 0).
@@ -286,4 +351,176 @@ pub fn leer_compra(
         path.display()
     )
     .into())
+}
+
+#[cfg(test)]
+mod tests_escenarios {
+    use super::*;
+    use crate::competencia::matriz_w;
+    use crate::config::Config;
+    use crate::datos::Datos;
+    use crate::paso1::{patron_serpentina, reparar_a_banda};
+    use crate::tabu::DEFAULT_ROW_SEQUENCE;
+
+    /// Los resultados de ω = 0 y de los primeros ω no dependen de cuántos escenarios se corran.
+    #[test]
+    fn omega0_no_depende_de_n() {
+        let datos = Datos::base();
+        let mut config = Config::default();
+        config.tabu.max_iter = 200;
+        config.tabu.max_sin_mejora = 50;
+        let inst = Instancia::nueva("1ha", 1.0, &datos, &config, 1.0, false);
+        let mut base = patron_serpentina(&inst.malla, DEFAULT_ROW_SEQUENCE, inst.d_tot);
+        reparar_a_banda(&mut base, &inst.banda);
+        let mut d = [0u32; N_ESPECIES];
+        for &c in &base {
+            if c > 0 {
+                d[c as usize - 1] += 1;
+            }
+        }
+        let mc = ParamsMc {
+            mu: 129.0,
+            sigma: 3.3,
+            p_hat: [0.1; N_ESPECIES],
+        };
+        let entrada = EntradaPaso3 {
+            instancia: &inst,
+            base: &base,
+            q: d,
+            d,
+            mc: &mc,
+            semilla: config.semilla,
+        };
+        let params = config.tabu.params_para(config.semilla, inst.malla.len());
+        let (f3, phi3, e3) = correr_instancia(&entrada, 3, &params);
+        let (f7, phi7, e7) = correr_instancia(&entrada, 7, &params);
+        assert_eq!((f3.len(), f7.len()), (3, 7));
+        assert_eq!(phi3, phi7);
+        assert_eq!(e3, e7);
+        for (a, b) in f3.iter().zip(&f7) {
+            assert_eq!(
+                (a.omega, a.caso, a.t, a.v_lib, a.m, a.z, a.z_por_planta),
+                (b.omega, b.caso, b.t, b.v_lib, b.m, b.z, b.z_por_planta)
+            );
+            assert_eq!(
+                (a.iteraciones, a.motivo_paro),
+                (b.iteraciones, b.motivo_paro)
+            );
+        }
+    }
+
+    /// Entrada pequeña (1 ha, tabú corto) para las pruebas del detalle.
+    fn con_entrada<R>(f: impl FnOnce(&EntradaPaso3, &ParamsTabu, &Datos, &Config) -> R) -> R {
+        let datos = Datos::base();
+        let mut config = Config::default();
+        config.tabu.max_iter = 100;
+        config.tabu.max_sin_mejora = 30;
+        let inst = Instancia::nueva("1ha", 1.0, &datos, &config, 1.0, false);
+        let mut base = patron_serpentina(&inst.malla, DEFAULT_ROW_SEQUENCE, inst.d_tot);
+        reparar_a_banda(&mut base, &inst.banda);
+        let mut d = [0u32; N_ESPECIES];
+        for &c in &base {
+            if c > 0 {
+                d[c as usize - 1] += 1;
+            }
+        }
+        let mc = ParamsMc {
+            mu: 129.0,
+            sigma: 3.3,
+            p_hat: [0.1; N_ESPECIES],
+        };
+        let entrada = EntradaPaso3 {
+            instancia: &inst,
+            base: &base,
+            q: d,
+            d,
+            mc: &mc,
+            semilla: config.semilla,
+        };
+        let params = config.tabu.params_para(config.semilla, inst.malla.len());
+        f(&entrada, &params, &datos, &config)
+    }
+
+    #[test]
+    fn detalle_igual_a_correr_instancia() {
+        con_entrada(|entrada, params, datos, config| {
+            let w = matriz_w(&datos.especies, config.kappa);
+            let (filas, phi0, e0) = correr_instancia(entrada, 3, params);
+            let s = correr_instancia_detalle(entrada, 3, params, &datos.especies, &w, true);
+            assert_eq!(s.filas.len(), 3);
+            for (a, b) in filas.iter().zip(&s.filas) {
+                assert_eq!(
+                    (
+                        a.omega,
+                        a.caso,
+                        a.t,
+                        a.v_lib,
+                        a.m,
+                        a.z,
+                        a.z_por_planta,
+                        a.iteraciones
+                    ),
+                    (
+                        b.omega,
+                        b.caso,
+                        b.t,
+                        b.v_lib,
+                        b.m,
+                        b.z,
+                        b.z_por_planta,
+                        b.iteraciones
+                    )
+                );
+            }
+            assert_eq!(phi0, s.phi0);
+            assert_eq!(e0, s.e0);
+            assert!(s.conteos.is_some());
+            let sin = correr_instancia_detalle(entrada, 2, params, &datos.especies, &w, false);
+            assert!(sin.conteos.is_none());
+        });
+    }
+
+    #[test]
+    fn niveles_suman_z() {
+        con_entrada(|entrada, params, datos, config| {
+            let w = matriz_w(&datos.especies, config.kappa);
+            let s = correr_instancia_detalle(entrada, 3, params, &datos.especies, &w, false);
+            assert_eq!(s.niveles.len(), 3);
+            for (f, n) in s.filas.iter().zip(&s.niveles) {
+                assert!((n.iter().sum::<f64>() - f.z).abs() < 1e-9, "{n:?} {}", f.z);
+            }
+        });
+    }
+
+    #[test]
+    fn conteos_suman_sobre_escenarios() {
+        con_entrada(|entrada, params, datos, config| {
+            let w = matriz_w(&datos.especies, config.kappa);
+            let inst = entrada.instancia;
+            let s = correr_instancia_detalle(entrada, 2, params, &datos.especies, &w, true);
+            let mut esperado = Conteos::default();
+            for omega in 0..2 {
+                let e = generar(
+                    inst.malla.len(),
+                    inst.area,
+                    inst.map_id,
+                    omega,
+                    entrada.semilla,
+                    entrada.mc,
+                );
+                let p = ParamsTabu {
+                    semilla: entrada.semilla.wrapping_add(omega as u64),
+                    ..*params
+                };
+                let (_, phi) =
+                    resolver_escenario(inst, entrada.base, &entrada.q, &entrada.d, &e, &p);
+                let mut ex = vec![false; phi.len()];
+                for &(u, _) in &e.posiciones {
+                    ex[u] = true;
+                }
+                esperado.sumar(&conteos(&inst.malla, &inst.grafo, &phi, &ex));
+            }
+            assert_eq!(s.conteos.unwrap(), esperado);
+        });
+    }
 }

@@ -170,14 +170,66 @@ def fig_mapa(inst, origen, salida):
     plt.close(fig)
 
 
+@figura("orden_plantacion")
+def fig_orden_plantacion(inst, origen, salida):
+    """Malla del patrón ω = 0 con los primeros 60 pasos de siembra numerados y unidos por una línea."""
+    ruta = origen / f"paso3_patron_{inst}_omega0.csv"
+    if not ruta.exists():
+        print(f"aviso: orden_plantacion_{inst} omitido, falta {ruta.name}")
+        return
+    try:
+        from transicion import orden_serpentina
+    except ImportError:
+        from python.transicion import orden_serpentina
+    d = pd.read_csv(ruta)
+    o = orden_serpentina(d)
+    cmap = plt.get_cmap("tab10")
+    nombres = _nombres_cortos()
+    fig, ax = plt.subplots(figsize=(10, 8))
+    vac = d[d["especie"] < 0]
+    ax.scatter(vac["x"], vac["y"], s=18, facecolors="none", edgecolors="#bbbbbb", lw=0.6)
+    for j in range(J):
+        sj = d[d["especie"] == j]
+        ax.scatter(sj[sj["existente"] == 0]["x"], sj[sj["existente"] == 0]["y"], s=75,
+                   color=cmap(j), lw=0)
+        ax.scatter(sj[sj["existente"] == 1]["x"], sj[sj["existente"] == 1]["y"], s=75,
+                   color=cmap(j), edgecolors="black", lw=1.6)
+    p = o.head(60)
+    ax.plot(p["x"], p["y"], color="black", lw=0.8, alpha=0.7)
+    for _, r in p.iterrows():
+        ax.annotate(str(int(r["paso"])), (r["x"], r["y"]), ha="center", va="center", fontsize=6,
+                    color="white", fontweight="bold")
+    ax.set_aspect("equal")
+    ax.invert_yaxis()
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("y (m)")
+    ax.set_title(f"Orden de plantación en serpentina, primeros {len(p)} pasos ({inst})")
+    asas = [plt.Line2D([], [], marker="o", ls="", color=cmap(j), label=nombres[j]) for j in range(J)]
+    asas.append(plt.Line2D([], [], marker="o", ls="", mfc="#999999", mec="black", mew=1.6,
+                           label="existente"))
+    ax.legend(handles=asas, loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=6, fontsize=8,
+              frameon=False)
+    _guardar(fig, salida / f"orden_plantacion_{inst}.png")
+
+
 @figura("practica_distribucion", por_instancia=False)
 def fig_practica_distribucion(origen, salida, instancias=None):
     d = pd.read_csv(origen / "practica_distribucion.csv")
     d = d[d["instancia"].isin(instancias or INSTANCIAS)]
     insts = list(dict.fromkeys(d["instancia"]))
-    variantes = ["i_serpentina", "ii_serpentina_banda", "iii_serpentina_existentes",
-                 "tabu_sin_existentes", "tabu_con_existentes"]
-    etqs = ["i\nserpentina", "ii\nserp. banda", "iii\nserp. exist.", "tabú\nsin exist.", "tabú\ncon exist."]
+    todas = [("i_serpentina", "i\nserpentina", "#999999"),
+             ("ii_serpentina_banda", "ii\nserp. banda", "#999999"),
+             ("iii_serpentina_existentes", "iii\nserp. exist.", "#999999"),
+             ("tabu_sin_existentes", "tab\u00fa\nsin exist.", "#1b6ca8"),
+             ("tabu_con_existentes", "tab\u00fa\ncon exist.", "#1b9e77"),
+             ("dsatur_sin_existentes", "DSATUR\nsin exist.", "#7570b3"),
+             ("dsatur_con_existentes", "DSATUR\ncon exist.", "#e6ab02")]
+    # Las variantes DSATUR faltan en CSV de corridas anteriores: se omiten si no estan.
+    presentes = set(d["variante"])
+    todas = [t for t in todas if t[0] in presentes]
+    variantes = [t[0] for t in todas]
+    etqs = [t[1] for t in todas]
+    colores = [t[2] for t in todas]
     fig, axs = plt.subplots(len(insts), 2, figsize=(13, 4.6 * len(insts)), squeeze=False)
     niveles = [f"Z_nivel{k}" for k in range(1, 6)] + ["Z_otro"]
     col_niv = ["#1b6ca8", "#d95f02", "#1b9e77", "#7570b3", "#e6ab02", "#999999"]
@@ -185,7 +237,7 @@ def fig_practica_distribucion(origen, salida, instancias=None):
     for fila, inst in enumerate(insts):
         s = d[d["instancia"] == inst].set_index("variante").reindex(variantes)
         ax = axs[fila, 0]
-        ax.bar(x, s["Z"], color=["#999999"] * 3 + ["#1b6ca8", "#1b9e77"])
+        ax.bar(x, s["Z"], color=colores)
         for xi, z, p in zip(x, s["Z"], s["pares_inmediatos_misma_especie"]):
             ax.annotate(f"{z:.0f}\n{int(p)} pares", (xi, z), ha="center", va="bottom", fontsize=8)
         ax.set_xticks(x)
@@ -207,6 +259,30 @@ def fig_practica_distribucion(origen, salida, instancias=None):
         if fila == 0:
             ax.legend(fontsize=8, ncol=6, loc="upper center")
     _guardar(fig, salida / "practica_distribucion.png")
+
+
+@figura("sensibilidad", por_instancia=False)
+def fig_sensibilidad(origen, salida, instancias=None):
+    d = pd.read_csv(origen / "sensibilidad.csv")
+    variantes = [v for v in dict.fromkeys(d["variante"]) if v != "base"]
+    insts = list(dict.fromkeys(d["instancia"]))
+    colores = ["#1b6ca8", "#d95f02", "#1b9e77", "#7570b3"]
+    fig, axs = plt.subplots(1, 2, figsize=(13, 4.8))
+    for ax, col, tit in [(axs[0], "cambio_z_opt_pct", "Paso 1: z_opt (medio)"),
+                         (axs[1], "cambio_z_paso3_pct", "Paso 3: Z medio")]:
+        ancho = 0.8 / len(insts)
+        x = np.arange(len(variantes))
+        for k, inst in enumerate(insts):
+            s = d[d["instancia"] == inst].set_index("variante").reindex(variantes)
+            ax.bar(x + k * ancho - 0.4 + ancho / 2, s[col], ancho, label=inst,
+                   color=colores[k % len(colores)])
+        ax.axhline(0, color="black", lw=0.8)
+        ax.set_xticks(x)
+        ax.set_xticklabels(variantes, rotation=35, ha="right", fontsize=8)
+        ax.set_ylabel("cambio frente a base (%)")
+        ax.set_title(tit)
+        ax.legend(fontsize=8)
+    _guardar(fig, salida / "sensibilidad.png")
 
 
 def main(nombres=None, instancias=None, origen=None, salida=None):

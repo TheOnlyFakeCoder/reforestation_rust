@@ -25,6 +25,9 @@ FIGURAS_LISTA = [
     ("mapa_map_27.png", "Mapa socia vs. tabú (paso 3, ω = 0), P1"),
     ("practica_compra.png", "Práctica actual vs. modelo: compra de plantas"),
     ("practica_distribucion.png", "Práctica actual vs. tabú: distribución"),
+    ("orden_plantacion_1ha.png", "Orden de plantación en serpentina (paso 3, ω = 0), 1 ha"),
+    ("orden_plantacion_map_27.png", "Orden de plantación en serpentina (paso 3, ω = 0), P1"),
+    ("sensibilidad.png", "Sensibilidades: cambio de z_opt (paso 1) y de Z (paso 3) frente a base"),
 ]
 
 
@@ -179,6 +182,7 @@ def _practica(o):
     c = _csv(o, "practica_compra.csv")
     c = c[c["instancia"].isin(INSTANCIAS)].drop(columns=["map_id", "escenarios"])
     d = _csv(o, "practica_distribucion.csv")
+    frase_dsatur = _frase_dsatur(d)
     d = d[d["instancia"].isin(INSTANCIAS)].copy()
     m = _csv(o, "malla_resumen.csv").set_index("instancia")
     d["D_tot"] = m["d_tot"].reindex(d["instancia"]).to_numpy()
@@ -197,6 +201,7 @@ def _practica(o):
             + "\n\nDistribución. `Z_por_planta` divide entre las plantas presentes (T + M), que en "
             "las variantes con existentes son menos que D_tot; por eso se añaden Z/D_tot y Z/ha "
             "(D_tot y el área vienen de `malla_resumen.csv`):\n\n" + tabla_md(d)
+            + ("\n\n" + frase_dsatur if frase_dsatur else "")
             + "\n\nMarkov. Titular: las filas `compra_d` (compra del paso 2, ε = 0.1) y "
             "`compra_nominal` (q = D̄) proyectan la supervivencia sobre las plantas realmente "
             "plantadas, E[min(q_j, C⁺_j)] sobre los escenarios. Las filas `D_completo` suponen "
@@ -311,7 +316,12 @@ def _validacion(o):
     no = d[~d["optimo_probado"]]
     por_form = {f: int((opt["formulacion"] == f).sum()) for f in ("basica", "ajustada")}
     tl = ", ".join(f"{t:g}" for t in sorted(v["tiempo_limite_s"].unique()))
-    wk = ", ".join(str(int(w)) for w in sorted(v["workers"].unique()))
+    wk_form = {f: sorted(int(w) for w in g["workers"].unique()) for f, g in v.groupby("formulacion")}
+    if len({tuple(w) for w in wk_form.values()}) > 1:  # p. ej. la ajustada se volvió a correr con más hilos
+        wk = (", ".join(map(str, wk_form.get("basica", []))) + " workers en la básica y "
+              + ", ".join(map(str, wk_form.get("ajustada", []))) + " en la ajustada")
+    else:
+        wk = ", ".join(str(int(w)) for w in sorted(v["workers"].unique())) + " workers por formulación"
     n3, n1 = int((d["modelo"] == "paso3").sum()), int((d["modelo"] == "paso1").sum())
     i_max = d["brecha_mejor"].idxmax()
     semillas = sorted({len(pd.read_csv(t)) for t in (Path(o) / "validacion").glob("tabu_*.csv")})
@@ -319,7 +329,7 @@ def _validacion(o):
     hay_ajustada = (v["formulacion"] == "ajustada").any()
     partes = [
         f"Se corrió CP-SAT (OR-Tools) sobre {n} instancias pequeñas ({n3} del paso 3, ec. 24, y {n1} "
-        f"del paso 1, ec. 21) con un límite de {tl} s y {wk} workers por formulación"
+        f"del paso 1, ec. 21) con un límite de {tl} s y {wk}"
         + (f"; ninguna se probó óptima en ese tiempo" if len(opt) == 0 else "") + ". En las "
         f"{len(v)} corridas CP-SAT arrancó con la mejor solución del tabú{de_semillas} como hint "
         "(`AddHint`). "
@@ -420,14 +430,294 @@ def _validacion(o):
     return "\n\n".join(partes)
 
 
+def _falta(nombre, como):
+    return f"Falta `{nombre}` ({como})."
+
+
+def _num(v):
+    return format(v, "g") if isinstance(v, (int, float)) else str(v)
+
+
+def _entorno(o):
+    o = Path(o)
+    partes = []
+    ruta = o / "entorno.json"
+    if ruta.exists():
+        r = json.loads(ruta.read_text(encoding="utf-8"))
+        mods = {}
+        for m in r.get("ram_modulos", []):
+            k = f"{_num(m.get('capacidad_gb'))} GB {m.get('tipo')} a {_num(m.get('velocidad_mhz'))} MHz"
+            mods[k] = mods.get(k, 0) + 1
+        ram = "; ".join(f"{n} × {k}" for k, n in mods.items()) or "módulos desconocidos"
+        partes.append("\n".join([
+            f"- Modelo de la PC: {r.get('modelo_pc')}",
+            f"- Sistema operativo: {r.get('sistema_operativo')}",
+            f"- Procesador: {r.get('procesador')} ({_num(r.get('nucleos_fisicos'))} núcleos físicos, "
+            f"{_num(r.get('hilos_logicos'))} hilos lógicos)",
+            f"- Memoria RAM: {_num(r.get('ram_gb'))} GB ({ram})",
+            f"- Disco duro (C:): {_num(r.get('disco_total_gb'))} GB totales, "
+            f"{_num(r.get('disco_libre_gb'))} GB libres, tipo {r.get('tipo_disco')}",
+            f"- Commit del código: `{r.get('commit')}`",
+        ]) + "\n\nTamaños en GiB (2³⁰ bytes), de `entorno.json` (`python/entorno.py`).")
+        sw = pd.DataFrame(list(r.get("software", {}).items()), columns=["software", "versión"])
+        partes.append("Software utilizado:\n\n" + tabla_md(sw))
+    else:
+        partes.append(_falta("entorno.json", "se escribe con `python/entorno.py`"))
+    ruta = o / "tiempos.csv"
+    if ruta.exists():
+        t = pd.read_csv(ruta, dtype={"paso": str, "instancias": str})
+        t = t.drop_duplicates(subset=["paso", "instancias"], keep="last")
+        partes.append("Tiempos de cómputo de la última corrida de cada paso (`run_all.ps1` los mide "
+                      "con `Measure-Command` y añade una fila por paso a `results/tiempos.csv`, que "
+                      f"conserva todas las corridas). Suma: {t['segundos'].sum():,.1f} s "
+                      f"({t['segundos'].sum() / 3600:.2f} h).\n\n"
+                      + tabla_md(t[["paso", "instancias", "segundos", "fecha"]]))
+    else:
+        partes.append(_falta("tiempos.csv", "lo escribe `run_all.ps1`, una fila por paso"))
+    return "\n\n".join(partes)
+
+
+def _sin_barras(df):
+    """Escapa '|' dentro de las celdas de texto (|V|, |Ω|) para no romper la tabla Markdown."""
+    return df.apply(lambda c: c.map(lambda v: v.replace("|", "\\|") if isinstance(v, str) else v))
+
+
+def _tamano(o):
+    o = Path(o)
+    partes = []
+    ruta = o / "tamano_problema.csv"
+    if ruta.exists():
+        partes.append("Datos del problema (1 ha y P1): número de especies, plantas por hectárea "
+                      "(D_tot/área), plantas por especie D*_j (paso 1, γ*) y D̄_j = `Dnom_j` "
+                      "(densidad nominal × área), y posiciones de la malla |V| (`n_pos`):\n\n"
+                      + tabla_md(pd.read_csv(ruta)))
+    else:
+        partes.append(_falta("tamano_problema.csv", "se escribe con `python/tamano.py`"))
+    ruta = o / "tamano_modelo.csv"
+    if ruta.exists():
+        partes.append("Variables y restricciones por modelo. La fila `extensivo_completo` es el "
+                      "modelo estocástico completo en forma extensiva (x, y del acomodo replicadas "
+                      "por cada uno de los |Ω| = 1000 escenarios más las variables del paso 2); su "
+                      "tamaño justifica resolverlo por pasos:\n\n"
+                      + tabla_md(_sin_barras(pd.read_csv(ruta))))
+    else:
+        partes.append(_falta("tamano_modelo.csv", "se escribe con `python/tamano.py`"))
+    ruta = o / "tamano_parametros.csv"
+    if ruta.exists():
+        partes.append("Parámetros (la fila TOTAL es la suma de la columna `cantidad`):\n\n"
+                      + tabla_md(_sin_barras(pd.read_csv(ruta, keep_default_na=False))))
+    else:
+        partes.append(_falta("tamano_parametros.csv", "se escribe con `python/tamano.py`"))
+    return "\n\n".join(partes)
+
+
+def _ic(r):
+    return f"[{r['ic95_inf']:.2f}, {r['ic95_sup']:.2f}]"
+
+
+def _nombres_especies():
+    try:
+        from comun import leer_especies
+    except ImportError:
+        from python.comun import leer_especies
+    try:
+        return list(leer_especies()["especie"])
+    except Exception:
+        return None
+
+
+def _experimentacion(o):
+    o = Path(o)
+    ruta = o / "experimentacion.csv"
+    if not ruta.exists():
+        return _falta("experimentacion.csv", "se escribe con `python/experimentacion.py`")
+    e = pd.read_csv(ruta)
+    cfg = leer_config()
+    n3 = int(cfg.get("n_escenarios_paso3", 100))
+    m = o / "malla_resumen.csv"
+    otras = (len(pd.read_csv(m)) - len(INSTANCIAS)) if m.exists() else 29
+    nombres = _nombres_especies()
+    partes = [
+        "Valores esperados por hectárea sobre los escenarios (`results/experimentacion.csv`), "
+        "con IC 95 % = media ± 1.96·sd/√n (sd muestral, n escenarios). X_j son las plantas "
+        "existentes de la especie j y T = Σ X_j; C_j = max(D*_j − X_j, 0) son las plantas que hay que "
+        "suministrar para completar D*; q_j es la compra del paso 2 (ε = 0.1, π = 2c), constante; "
+        "n_j = min(q_j, C_j) son las plantas que realmente se suministran y plantan. Z es la "
+        "competencia del acomodo del paso 3 (con existentes) y Z_nivel1..5 y Z_otro su reparto por "
+        "nivel de competencia. Las magnitudes de Monte Carlo usan los 1000 escenarios; Z usa los "
+        "escenarios del paso 3 (columna n): 1000 en 1 ha y P1 (map_27), mientras que las otras "
+        f"{otras} instancias usan {n3} escenarios del paso 3 (`paso3_resumen.csv`)."]
+    for inst in [i for i in INSTANCIAS if i in set(e["instancia"])]:
+        s = e[e["instancia"] == inst]
+        g = s[s["especie"].isna()].set_index("magnitud")
+        lineas = []
+        if "T" in g.index:
+            r = g.loc["T"]
+            lineas.append(f"- E[T]/ha (existentes) = {r['media_ha']:.2f}, IC 95 % {_ic(r)}, "
+                          f"n = {int(r['n'])}")
+        if "Z" in g.index:
+            r = g.loc["Z"]
+            lineas.append(f"- E[Z]/ha (competencia) = {r['media_ha']:.2f}, IC 95 % {_ic(r)}, "
+                          f"n = {int(r['n'])}")
+        filas = []
+        for j in range(10):
+            f = {"especie": j}
+            if nombres is not None and j < len(nombres):
+                f["nombre"] = nombres[j]
+            for mag, col in (("X", "E[X_j]/ha"), ("C", "E[C_j]/ha"), ("q", "q_j/ha"),
+                             ("n", "E[n_j]/ha")):
+                r = s[(s["magnitud"] == mag) & (s["especie"] == j)]
+                if len(r):
+                    r = r.iloc[0]
+                    f[col] = f"{r['media_ha']:.2f}"
+                    if mag != "q":
+                        f[f"IC {mag}"] = _ic(r)
+            filas.append(f)
+        tot = {"especie": "total"}
+        for mag, col in (("X", "E[X_j]/ha"), ("C", "E[C_j]/ha"), ("q", "q_j/ha"), ("n", "E[n_j]/ha")):
+            tot[col] = f"{s.loc[s['magnitud'] == mag, 'media_ha'].sum():.2f}"
+        filas.append(tot)
+        esp = pd.DataFrame(filas).fillna("")
+        niv = [c for c in [f"Z_nivel{k}" for k in range(1, 6)] + ["Z_otro"] if c in g.index]
+        txt = f"### {inst}\n\n" + "\n".join(lineas) + "\n\nPor especie y por ha:\n\n" + tabla_md(esp)
+        if niv:
+            zn = pd.DataFrame([{"magnitud": c, "E/ha": f"{g.loc[c, 'media_ha']:.2f}",
+                                "sd/ha": f"{g.loc[c, 'sd_ha']:.2f}", "IC 95 %": _ic(g.loc[c]),
+                                "n": int(g.loc[c, "n"])} for c in niv])
+            txt += "\n\nE[Z por nivel de competencia]/ha:\n\n" + tabla_md(zn)
+        partes.append(txt)
+    return "\n\n".join(partes)
+
+
+def _matriz_ancha(m):
+    p = m.pivot(index="de", columns="a", values="prob").reindex(index=range(10), columns=range(10),
+                                                                fill_value=0.0)
+    df = p.apply(lambda c: c.map(lambda v: f"{v:.3f}"))
+    df.insert(0, "de \\ a", range(10))
+    df.columns = [str(c) for c in df.columns]
+    return tabla_md(df)
+
+
+def _orden_transiciones(o):
+    o = Path(o)
+    partes = []
+    ruta = o / "orden_plantacion_1ha.csv"
+    if ruta.exists():
+        op = pd.read_csv(ruta)
+        partes.append(
+            "Ejemplo de orden de plantación en 1 ha, sobre el patrón del paso 3 con ω = 0, en "
+            "serpentina: filas por `fila` creciente; dentro de la fila, `col` creciente si la fila "
+            "es par y decreciente si es impar; sólo plantas nuevas (las existentes y las posiciones "
+            f"vacías se saltan). Primeros 21 de {len(op)} pasos (completo en "
+            "`results/orden_plantacion_1ha.csv`, P1 en `orden_plantacion_map_27.csv`; figuras "
+            "`orden_plantacion_*.png`):\n\n" + tabla_md(op.head(21)))
+    else:
+        partes.append(_falta("orden_plantacion_1ha.csv", "se escribe con `python/transicion.py`"))
+    ruta = o / "transicion.csv"
+    if not ruta.exists():
+        partes.append(_falta("transicion.csv", "se escribe con `python/transicion.py`"))
+        return "\n\n".join(partes)
+    t = pd.read_csv(ruta)
+    t = t[(t["instancia"] == "1ha") & (t["patron"] == "tabu_paso3")]
+    agg = t[t["alcance"] == "todos_los_escenarios"]
+    titulos = {"orden": "Por orden de siembra: P(la siguiente planta sembrada es k | la actual es j)",
+               "vecindad": "Por vecindad inmediata: P(un vecino inmediato es k | la planta es j); "
+                           "incluye las existentes"}
+    if len(agg):
+        txt = ("### Matrices de transición (1 ha, todos los escenarios del paso 3)\n\n"
+               "Cada planta es un estado (especie j = 0..9); filas j (de), columnas k (a). Son las "
+               "matrices principales: acumulan los conteos de todos los escenarios del paso 3. Las "
+               "de P1 (map_27) están en `results/transicion.csv`.")
+        for tipo in ("orden", "vecindad"):
+            m = agg[agg["tipo"] == tipo]
+            if len(m):
+                txt += f"\n\n{titulos[tipo]}:\n\n" + _matriz_ancha(m)
+        partes.append(txt)
+    else:
+        partes.append("Falta la matriz agregada de 1 ha (`paso3_transicion_1ha.csv` de `reto paso3`).")
+    ruta = o / "transicion_estacionaria.csv"
+    if ruta.exists():
+        est = pd.read_csv(ruta)
+        est = est[(est["instancia"] == "1ha") & (est["patron"] == "tabu_paso3")
+                  & (est["alcance"] == "todos_los_escenarios")]
+        if len(est):
+            d = pd.DataFrame({"especie": est["especie"].to_numpy(),
+                              "pi_estacionaria": est["pi_estacionaria"].map(lambda v: f"{v:.3f}").to_numpy(),
+                              "composicion_plantada": est["composicion_plantada"].map(lambda v: f"{v:.3f}").to_numpy(),
+                              "diferencia": (est["pi_estacionaria"] - est["composicion_plantada"]).map(
+                                  lambda v: f"{v:.3f}").to_numpy()})
+            dif = (est["pi_estacionaria"] - est["composicion_plantada"]).abs().max()
+            partes.append("Distribución estacionaria de la matriz por vecindad contra la composición "
+                          "plantada (fracción de plantas por especie, existentes incluidas); "
+                          f"diferencia absoluta máxima {dif:.3f}:\n\n" + tabla_md(d))
+    ej = t[t["alcance"] == "omega0"]
+    if len(ej):
+        txt = ("### ω = 0 (ejemplo de un solo escenario)\n\nLas mismas matrices sobre el patrón de "
+               "ω = 0 (el del orden de plantación de arriba), sólo como ejemplo.")
+        for tipo in ("orden", "vecindad"):
+            m = ej[ej["tipo"] == tipo]
+            if len(m):
+                txt += f"\n\n{titulos[tipo]}:\n\n" + _matriz_ancha(m)
+        partes.append(txt)
+    return "\n\n".join(partes)
+
+
+def _sensibilidades(o):
+    ruta = Path(o) / "sensibilidad.csv"
+    if not ruta.exists():
+        return _falta("sensibilidad.csv", "se escribe con `python/sensibilidad.py`: κ, radios, m y s2")
+    s = pd.read_csv(ruta)
+    met = ["variante", "instancia", "suma_theta_d", "z_opt_media", "z_opt_sd", "cambio_z_opt_pct",
+           "costo_compra", "faltante_esperado", "z_paso3_media", "z_paso3_sd", "cambio_z_paso3_pct",
+           "z_practica_iii", "z_dsatur_con", "z_tabu_con"]
+    comp = ["variante", "instancia"] + [f"D_{j}" for j in range(10)]
+    return ("Cada variante cambia un solo parámetro frente a `base`: κ = 0.4 y 0.8 (`kappa_*`), "
+            "radios × 0.75 y × 1.25 (`radios_*`), m × 0, 0.5 y 2 (`m_*`) y supervivencia a 2 años "
+            "(`s2`). Cadena completa (paso 1 con γ*, Monte Carlo, paso 2, paso 3 y práctica) en 1 ha "
+            "y P1 (map_27) con 100 escenarios del paso 3 en todas las variantes, incluida `base` "
+            "(por eso su Z del paso 3 puede diferir del de la sección del paso 3); en map_21 (8 ha) "
+            "sólo el paso 1, para comprobar que las conclusiones valen en un polígono grande. "
+            "`cambio_*_pct` es el cambio porcentual contra `base` en la misma instancia "
+            "(`results/sensibilidad.csv`; figura `sensibilidad.png`).\n\n"
+            + tabla_md(s[[c for c in met if c in s.columns]])
+            + "\n\nComposición D* por variante:\n\n" + tabla_md(s[[c for c in comp if c in s.columns]]))
+
+
+def _hay_dsatur(o):
+    ruta = Path(o) / "practica_distribucion.csv"
+    return ruta.exists() and pd.read_csv(ruta)["variante"].astype(str).str.startswith("dsatur").any()
+
+
+def _frase_dsatur(d):
+    partes = []
+    for inst in INSTANCIAS:
+        z = d[d["instancia"] == inst].set_index("variante")["Z"]
+        if "dsatur_con_existentes" not in z.index:
+            continue
+        g = z.get
+        txt = (f"en {inst}, Z = {g('dsatur_sin_existentes', np.nan):.1f} sin existentes y "
+               f"{z['dsatur_con_existentes']:.1f} con existentes, contra "
+               f"{g('tabu_sin_existentes', np.nan):.1f} y {g('tabu_con_existentes', np.nan):.1f} del "
+               f"tabú y {g('i_serpentina', np.nan):.1f} (i) y "
+               f"{g('iii_serpentina_existentes', np.nan):.1f} (iii) de la serpentina")
+        if "tabu_con_existentes" in z.index:
+            txt += (f" (con existentes, DSATUR queda "
+                    f"{100 * (z['dsatur_con_existentes'] / z['tabu_con_existentes'] - 1):+.1f} % "
+                    "frente al tabú)")
+        partes.append(txt)
+    return ("DSATUR por cuotas (§10): " + "; ".join(partes) + ".") if partes else ""
+
+
 def _pendiente(o=None):
     hecha = o is not None and (Path(o) / "validacion_exacta.csv").exists()
     cpsat = "" if hecha else "- Validación exacta con CP-SAT (§9).\n"
+    dsatur = "" if o is not None and _hay_dsatur(o) else "- Comparación con DSATUR (§10).\n"
+    sens = ("" if o is not None and (Path(o) / "sensibilidad.csv").exists() else
+            "- Sensibilidades: κ = 0.4 y 0.8, radios × 0.75 y × 1.25, m × 0, 0.5 y 2, y s2.\n")
+    if not (cpsat or dsatur or sens):
+        return "Todo lo de la especificación tiene salida en `results/`.\n"
     return ("Lo siguiente de la especificación no se hizo y no tiene salida en `results/`:\n\n"
-            + cpsat +
-            "- Comparación con DSATUR (§10).\n"
-            "- Sensibilidades: κ = 0.4 y 0.8, radios × 0.75 y × 1.25, m × 0, 0.5 y 2, y s2.\n"
-            "")
+            + cpsat + dsatur + sens)
 
 
 def _notas():
@@ -449,6 +739,8 @@ def generar(origen):
     return "\n\n".join([
         "# Resumen de resultados: reforestación CONAFOR (Entregable 2)",
         "Generado por `python/resumen.py` a partir de los CSV y JSON de `results/`.",
+        "## Entorno y software\n\n" + _entorno(origen),
+        "## Tamaño del problema\n\n" + _tamano(origen),
         "## Malla\n\n" + _malla(origen),
         "## Ajuste de distribuciones\n\n" + _ajuste(origen),
         "## Paso 1: composición y competencia\n\n" + _paso1(origen, cfg.get("gamma_star", 3)),
@@ -456,6 +748,9 @@ def generar(origen):
         "## Paso 2: compra\n\n" + _paso2(origen, cfg),
         "## Paso 3: ajuste al polígono real\n\n" + _paso3(origen),
         "## Práctica actual\n\n" + _practica(origen),
+        "## Experimentación (1000 simulaciones)\n\n" + _experimentacion(origen),
+        "## Orden de plantación y transiciones\n\n" + _orden_transiciones(origen),
+        "## Sensibilidades\n\n" + _sensibilidades(origen),
         "## Convergencia del tabú\n\n" + _convergencia(origen, cfg),
         "## Validación exacta\n\n" + _validacion(origen),
         "## Notas de interpretación\n\n" + _notas(),

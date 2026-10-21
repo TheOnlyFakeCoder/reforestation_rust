@@ -8,6 +8,7 @@ pub mod competition;
 pub mod composicion;
 pub mod config;
 pub mod datos;
+pub mod dsatur;
 pub mod escenarios;
 pub mod formatting;
 pub mod hex_grid;
@@ -24,6 +25,7 @@ pub mod reforestation;
 pub mod reportes;
 pub mod tabu;
 pub mod terrain;
+pub mod transicion;
 pub mod validacion;
 pub mod writer;
 

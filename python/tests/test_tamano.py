@@ -97,3 +97,14 @@ def test_main_escribe_tres_csv(origen, tmp_path_factory):
     tamano.main(origen=origen, destino=out)
     for n in ("tamano_modelo", "tamano_parametros", "tamano_problema"):
         assert (out / f"{n}.csv").exists()
+
+
+def test_nota_dice_que_cuentan_las_restricciones(origen):
+    df = tamano.tamano_modelos(origen)
+    t = fila(df, "1ha", "paso1_tabu")
+    assert t.restricciones == 30
+    assert "10 definiciones" in t.nota and "20 cotas" in t.nota and "sin restricciones lineales" in t.nota
+    p3 = fila(df, "1ha", "paso3_por_escenario")
+    assert p3.restricciones == 10 and "10 cuotas" in p3.nota
+    ext = fila(df, "1ha", "extensivo_completo")
+    assert "1 restricción de presupuesto" in ext.nota

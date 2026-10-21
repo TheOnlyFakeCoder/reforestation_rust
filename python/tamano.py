@@ -45,8 +45,10 @@ def tamano_modelos(origen):
         restr_lin = V + 10 + 20 + 3 * 100 * E
 
         filas.append(_fila(inst, "paso1_tabu", V, "enteras en {0..10}", 10 + 20,
-                           "una variable por posición; cuotas L_j <= n_j <= U_j y "
-                           "composición como penalización/filtro de la búsqueda"))
+                           "una variable por posición (la asignación única va implícita en "
+                           "phi_u en {0..10}); restricciones: 10 definiciones D_j = suma_u [phi_u = j] "
+                           "y 20 cotas L_j <= D_j <= U_j, sin restricciones lineales en la búsqueda "
+                           "tabú en sí"))
         filas.append(_fila(inst, "paso1_lineal", x_y, "binarias",
                            restr_lin,
                            f"10*|V| binarias x + 100*|E| y, |V|={V}, |E|={E}; "
@@ -68,13 +70,15 @@ def tamano_modelos(origen):
 
         v0 = int(p3[(p3.instancia == inst) & (p3.omega == 0)].iloc[0]["V_lib"])
         filas.append(_fila(inst, "paso3_por_escenario", v0, "enteras en {0..10}", 10,
-                           f"posiciones libres |V_lib| del escenario omega=0; "
-                           f"se resuelve una vez por cada uno de los |Omega|={N_OMEGA}"))
+                           f"posiciones libres |V_lib| del escenario omega=0; restricciones: "
+                           f"10 cuotas n_j; se resuelve una vez por cada uno de los |Omega|={N_OMEGA}"))
 
         var_ext = x_y + 10 + N_OMEGA * (x_y + 20)
         restr_ext = restr_lin + 1 + N_OMEGA * (V + 10 + 3 * 100 * E + 20)
         filas.append(_fila(inst, "extensivo_completo", var_ext, "binarias y enteras",
                            restr_ext,
+                           f"restricciones: las del paso 1 + 1 restricción de presupuesto + por "
+                           f"cada omega las del acomodo y de f_w, e_w; "
                            f"x, y del paso 1 + q (10) + por cada omega de |Omega|={N_OMEGA}: "
                            "x_w, y_w del acomodo (10*|V|+100*|E|) y f_w, e_w (20); "
                            "justifica la descomposición en pasos"))

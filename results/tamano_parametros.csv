@@ -1,0 +1,25 @@
+parametro,simbolo,cantidad,fuente
+costo unitario,c_j,10,data/especies.csv
+supervivencia a 1 año,s1_j,10,data/supervivencia.csv
+supervivencia a 2 años,s2_j,10,data/supervivencia.csv
+densidad nominal,δ_j,10,data/especies.csv
+radio de copa,R_j,10,data/rasgos.csv (radio_d)
+rasgos (7 por especie),rasgos,70,data/rasgos.csv
+matriz de interacción,W,100,construida de rasgos
+umbral de poda,θ_j,10,"derivado de c, s1, W (config m_escala)"
+cota inferior de composición,L_j,10,paso 1 (ε)
+cota superior de composición,U_j,10,paso 1 (ε)
+penalización por faltante,π_j,10,pi_factor * c_j
+distancia de vecindad,d,1,config/default.json
+tolerancia de composición,ε,1,config/default.json
+factor de vecindad,κ,1,config/default.json
+peso de interacción elegido,γ*,1,results/paso1_gamma_star.csv
+factor de radios,factor_radios,1,config/default.json
+presupuesto por ha,B,1,config/default.json
+penalización por sobrante,η,1,config (0 por defecto)
+media de plantas Monte Carlo,μ_ρ,1,results/mc_params.json
+desviación de plantas Monte Carlo,σ_ρ,1,results/mc_params.json
+proporciones de especie,p̂_j,10,results/mc_params.json
+escenarios Monte Carlo,|Ω|,1,config/default.json
+escenarios del paso 3,|Ω₃|,1,config/default.json
+TOTAL,,281,suma

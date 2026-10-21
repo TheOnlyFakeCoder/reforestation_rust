@@ -2,6 +2,113 @@
 
 Generado por `python/resumen.py` a partir de los CSV y JSON de `results/`.
 
+## Entorno y software
+
+- Modelo de la PC: LENOVO 83DG
+- Sistema operativo: Microsoft Windows 11 Home Single Language (versión 10.0.26300)
+- Procesador: Intel(R) Core(TM) i9-14900HX (24 núcleos físicos, 32 hilos lógicos)
+- Memoria RAM: 31.7 GiB (2 × 16 GiB DDR5 a 5600 MHz)
+- Disco duro (C:): 826.4 GiB totales, 238.5 GiB libres, tipo SSD
+- Commit del código: `5ac1a307cc4e13c3ed0b82ef7dd2fcdaf421acc5`
+
+Tamaños en GiB (2³⁰ bytes), de `entorno.json` (`python/entorno.py`).
+
+Software utilizado:
+
+| software | versión |
+| --- | --- |
+| rustc | rustc 1.99.1 (58cf8f9c3 2026-10-13) |
+| cargo | cargo 1.99.1 (5f94df478 2026-08-27) |
+| python | 3.12.5 |
+| numpy | 2.5.4 |
+| scipy | 1.18.1 |
+| pandas | 3.0.6 |
+| matplotlib | 3.11.2 |
+| pulp | 4.0.1 |
+| highspy | 1.15.1 |
+| ortools | 9.15.6755 |
+| pytest | 9.1.1 |
+
+Tiempos de cómputo de la última corrida de cada paso (`run_all.ps1` los mide con `Measure-Command` y añade una fila por paso a `results/tiempos.csv`, que conserva todas las corridas). Suma: 7,989.7 s (2.22 h).
+
+| paso | instancias | segundos | fecha |
+| --- | --- | --- | --- |
+| cargo build --release --bin reto |  | 0.274 | 2026-10-21T23:56:08 |
+| reto datos |  | 0.014 | 2026-10-21T23:56:08 |
+| reto malla |  | 0.166 | 2026-10-21T23:56:08 |
+| python python\ajuste.py |  | 1.819 | 2026-10-21T23:56:10 |
+| reto paso1 | 1ha,map_27 | 17.564 | 2026-10-21T23:56:28 |
+| reto paso1 --solo-gamma-star | todas | 385.921 | 2026-10-22T00:02:54 |
+| reto montecarlo | todas | 0.604 | 2026-10-22T00:02:54 |
+| python python\paso2_compra.py |  | 8.367 | 2026-10-22T00:03:03 |
+| reto paso3 | todas | 1127.113 | 2026-10-22T00:21:50 |
+| reto practica | todas | 1.549 | 2026-10-22T00:21:51 |
+| python python\transicion.py |  | 0.709 | 2026-10-22T00:21:52 |
+| python python\entorno.py |  | 5.708 | 2026-10-22T00:21:58 |
+| python python\tamano.py |  | 0.931 | 2026-10-22T00:21:59 |
+| python python\experimentacion.py |  | 0.704 | 2026-10-22T00:21:59 |
+| python python\sensibilidad.py |  | 369.205 | 2026-10-22T00:28:09 |
+| python python\practica_compra.py |  | 0.858 | 2026-10-22T00:28:09 |
+| python python\markov.py |  | 0.722 | 2026-10-22T00:28:10 |
+| python python\figuras.py |  | 5.636 | 2026-10-22T00:28:16 |
+| python python\resumen.py |  | 0.918 | 2026-10-22T00:28:17 |
+| reto instancias-val |  | 0.021 | 2026-10-22T02:17:35 |
+| reto tabu-val |  | 4.151 | 2026-10-22T02:17:39 |
+| python python\validacion_exacta.py --formulaciones ajustada --workers 32 --actualizar |  | 6056.732 | 2026-10-22T03:58:35 |
+
+## Tamaño del problema
+
+Datos del problema (1 ha y P1): número de especies, plantas por hectárea (D_tot/área), plantas por especie D*_j (paso 1, γ*) y D̄_j = `Dnom_j` (densidad nominal × área), y posiciones de la malla |V| (`n_pos`):
+
+| instancia | especies | plantas_por_ha | D_tot | n_pos | D_0 | D_1 | D_2 | D_3 | D_4 | D_5 | D_6 | D_7 | D_8 | D_9 | Dnom_0 | Dnom_1 | Dnom_2 | Dnom_3 | Dnom_4 | Dnom_5 | Dnom_6 | Dnom_7 | Dnom_8 | Dnom_9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1ha | 10 | 658 | 658 | 658 | 46 | 178 | 38 | 46 | 53 | 41 | 80 | 58 | 94 | 24 | 42 | 196 | 42 | 42 | 49 | 38 | 73 | 64 | 86 | 26 |
+| map_27 | 10 | 657.8125 | 842 | 842 | 59 | 226 | 49 | 59 | 69 | 52 | 102 | 74 | 121 | 31 | 54 | 251 | 54 | 54 | 63 | 48 | 93 | 82 | 110 | 33 |
+
+Variables y restricciones por modelo. La fila `extensivo_completo` es el modelo estocástico completo en forma extensiva (x, y del acomodo replicadas por cada uno de los |Ω| = 1000 escenarios más las variables del paso 2); su tamaño justifica resolverlo por pasos. La columna `nota` dice qué cuenta `restricciones` en cada fila (tabú del paso 1: 10 definiciones D_j y 20 cotas L_j ≤ D_j ≤ U_j; paso 3: 10 cuotas; en el extensivo se suma 1 restricción de presupuesto):
+
+| instancia | modelo | variables | tipo_variables | restricciones | nota |
+| --- | --- | --- | --- | --- | --- |
+| 1ha | paso1_tabu | 658 | enteras en {0..10} | 30 | una variable por posición (la asignación única va implícita en phi_u en {0..10}); restricciones: 10 definiciones D_j = suma_u [phi_u = j] y 20 cotas L_j <= D_j <= U_j, sin restricciones lineales en la búsqueda tabú en sí |
+| 1ha | paso1_lineal | 550880 | binarias | 1633588 | 10*\|V\| binarias x + 100*\|E\| y, \|V\|=658, \|E\|=5443; restricciones \|V\|+10+20+3*100*\|E\| |
+| 1ha | paso2_ple | 436 | 10 enteras q + 426 continuas f/e | 427 | conteos reales del modelo agrupado por valores distintos de C_j; la forma completa sin agrupar tiene 10 q + 2*10*\|Omega\| f/e (\|Omega\|=1000 en esta corrida) |
+| 1ha | paso3_por_escenario | 526 | enteras en {0..10} | 10 | posiciones libres \|V_lib\| del escenario omega=0; restricciones: 10 cuotas n_j; se resuelve una vez por cada uno de los \|Omega\|=1000 |
+| 1ha | extensivo_completo | 551450890 | binarias y enteras | 1635221589 | restricciones: las del paso 1 + 1 restricción de presupuesto + por cada omega las del acomodo y de f_w, e_w; x, y del paso 1 + q (10) + por cada omega de \|Omega\|=1000: x_w, y_w del acomodo (10*\|V\|+100*\|E\|) y f_w, e_w (20); justifica la descomposición en pasos |
+| map_27 | paso1_tabu | 842 | enteras en {0..10} | 30 | una variable por posición (la asignación única va implícita en phi_u en {0..10}); restricciones: 10 definiciones D_j = suma_u [phi_u = j] y 20 cotas L_j <= D_j <= U_j, sin restricciones lineales en la búsqueda tabú en sí |
+| map_27 | paso1_lineal | 711620 | binarias | 2110472 | 10*\|V\| binarias x + 100*\|E\| y, \|V\|=842, \|E\|=7032; restricciones \|V\|+10+20+3*100*\|E\| |
+| map_27 | paso2_ple | 478 | 10 enteras q + 468 continuas f/e | 469 | conteos reales del modelo agrupado por valores distintos de C_j; la forma completa sin agrupar tiene 10 q + 2*10*\|Omega\| f/e (\|Omega\|=1000 en esta corrida) |
+| map_27 | paso3_por_escenario | 670 | enteras en {0..10} | 10 | posiciones libres \|V_lib\| del escenario omega=0; restricciones: 10 cuotas n_j; se resuelve una vez por cada uno de los \|Omega\|=1000 |
+| map_27 | extensivo_completo | 712351630 | binarias y enteras | 2112582473 | restricciones: las del paso 1 + 1 restricción de presupuesto + por cada omega las del acomodo y de f_w, e_w; x, y del paso 1 + q (10) + por cada omega de \|Omega\|=1000: x_w, y_w del acomodo (10*\|V\|+100*\|E\|) y f_w, e_w (20); justifica la descomposición en pasos |
+
+Parámetros (la fila TOTAL es la suma de la columna `cantidad`):
+
+| parametro | simbolo | cantidad | fuente |
+| --- | --- | --- | --- |
+| costo unitario | c_j | 10 | data/especies.csv |
+| supervivencia a 1 año | s1_j | 10 | data/supervivencia.csv |
+| supervivencia a 2 años | s2_j | 10 | data/supervivencia.csv |
+| densidad nominal | δ_j | 10 | data/especies.csv |
+| radio de copa | R_j | 10 | data/rasgos.csv (radio_d) |
+| rasgos (7 por especie) | rasgos | 70 | data/rasgos.csv |
+| matriz de interacción | W | 100 | construida de rasgos |
+| umbral de poda | θ_j | 10 | derivado de c, s1, W (config m_escala) |
+| cota inferior de composición | L_j | 10 | paso 1 (ε) |
+| cota superior de composición | U_j | 10 | paso 1 (ε) |
+| penalización por faltante | π_j | 10 | pi_factor * c_j |
+| distancia de vecindad | d | 1 | config/default.json |
+| tolerancia de composición | ε | 1 | config/default.json |
+| factor de vecindad | κ | 1 | config/default.json |
+| peso de interacción elegido | γ* | 1 | results/paso1_gamma_star.csv |
+| factor de radios | factor_radios | 1 | config/default.json |
+| presupuesto por ha | B | 1 | config/default.json |
+| penalización por sobrante | η | 1 | config (0 por defecto) |
+| media de plantas Monte Carlo | μ_ρ | 1 | results/mc_params.json |
+| desviación de plantas Monte Carlo | σ_ρ | 1 | results/mc_params.json |
+| proporciones de especie | p̂_j | 10 | results/mc_params.json |
+| escenarios Monte Carlo | \|Ω\| | 1 | config/default.json |
+| escenarios del paso 3 | \|Ω₃\| | 1 | config/default.json |
+| TOTAL |  | 281 | suma |
+
 ## Malla
 
 ### 1 ha y P1 (map_27)
@@ -327,9 +434,9 @@ Comparación de π (1 ha y P1):
 
 ## Paso 3: ajuste al polígono real
 
-Los escenarios caen en `presupuesto_corto` en 3100 de 3100 casos. El nombre es el de la especificación para Σn < |V_lib|; aquí no lo causa el presupuesto. Con π = 2c la razón crítica es 0.5, así que el modelo compra cerca de la mediana de C, y además la malla tiene posiciones de más (|V| > D_tot). Como el caso `usual` exige Σn = |V_lib|, no se alcanza si algún q_j < C_j o si |V| > D_tot.
+Los escenarios caen en `presupuesto_corto` en 4900 de 4900 casos. El nombre es el de la especificación para Σn < |V_lib|; aquí no lo causa el presupuesto. Con π = 2c la razón crítica es 0.5, así que el modelo compra cerca de la mediana de C, y además la malla tiene posiciones de más (|V| > D_tot). Como el caso `usual` exige Σn = |V_lib|, no se alcanza si algún q_j < C_j o si |V| > D_tot.
 
-Huecos medios por hectárea, (V_lib − M)/A: entre 4.4 y 12.2 en las 31 instancias (12.2 en 1 ha, 10.6 en P1/map_27). Cada hueco se parte en faltante de compra (ΣC⁺ − M, que coincide con el `faltante_esperado` del paso 2 salvo por el número de escenarios: 100 aquí, 1000 allá) y excedente de malla (|V| − D_tot). El excedente de malla va de 0 a 8 posiciones.
+Huecos medios por hectárea, (V_lib − M)/A: entre 4.4 y 12.3 en las 31 instancias (12.3 en 1 ha, 10.8 en P1/map_27). Cada hueco se parte en faltante de compra (ΣC⁺ − M, que coincide con el `faltante_esperado` del paso 2 salvo por el número de escenarios: 1000 escenarios en 1ha, map_27; 100 escenarios en 29 instancias; donde ambos usan los mismos escenarios coinciden exactamente) y excedente de malla (|V| − D_tot). El excedente de malla va de 0 a 8 posiciones.
 
 El presupuesto no es activo con π = 2: la compra cabe en todas las instancias, con una holgura B·A − costo de $78 a $898. Es un hallazgo del modelo, no un error.
 
@@ -337,15 +444,15 @@ Huecos de paso 3 (1 ha y P1):
 
 | instancia | area_ha | huecos | huecos_por_ha | faltante_compra | faltante_esperado_paso2 | excedente_malla | holgura_presupuesto |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1ha | 1 | 12.17 | 12.17 | 12.17 | 12.264 | 0 | 78 |
-| map_27 | 1.28 | 13.54 | 10.5781 | 13.54 | 13.805 | 0 | 108 |
+| 1ha | 1 | 12.264 | 12.264 | 12.264 | 12.264 | 0 | 78 |
+| map_27 | 1.28 | 13.805 | 10.7852 | 13.805 | 13.805 | 0 | 108 |
 
 Huecos de paso 3 (todas las instancias):
 
 | instancia | area_ha | huecos | huecos_por_ha | faltante_compra | faltante_esperado_paso2 | excedente_malla | holgura_presupuesto |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1ha | 1 | 12.17 | 12.17 | 12.17 | 12.264 | 0 | 78 |
-| map_27 | 1.28 | 13.54 | 10.5781 | 13.54 | 13.805 | 0 | 108 |
+| 1ha | 1 | 12.264 | 12.264 | 12.264 | 12.264 | 0 | 78 |
+| map_27 | 1.28 | 13.805 | 10.7852 | 13.805 | 13.805 | 0 | 108 |
 | map_28 | 6.64 | 32.69 | 4.9232 | 31.69 | 33.384 | 1 | 719.5 |
 | map_30 | 6.76 | 36.15 | 5.3476 | 33.15 | 33.06 | 3 | 682 |
 | map_20 | 1.38 | 14.66 | 10.6232 | 14.66 | 14.868 | 0 | 150.5 |
@@ -380,8 +487,8 @@ Resumen del paso 3. `Z_sd` es la desviación sobre escenarios (una semilla por e
 
 | instancia | n | Z_media | Z_sd | Z_p5 | Z_p50 | Z_p95 | casos_usual | casos_presupuesto_corto | casos_existentes_de_sobra | paros_tope | paros_sin_mejora |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1ha | 100 | 565.399 | 11.0873 | 546.4848 | 566.7592 | 581.8551 | 0 | 100 | 0 | 0 | 100 |
-| map_27 | 100 | 734.0388 | 11.1025 | 717.3807 | 733.2722 | 751.9228 | 0 | 100 | 0 | 0 | 100 |
+| 1ha | 1000 | 564.7676 | 10.6135 | 546.3742 | 565.2736 | 581.1879 | 0 | 1000 | 0 | 0 | 1000 |
+| map_27 | 1000 | 733.2819 | 12.0369 | 711.9399 | 734.1824 | 752.5049 | 0 | 1000 | 0 | 0 | 1000 |
 | map_28 | 100 | 4075.6706 | 42.6874 | 4008.4172 | 4076.4149 | 4136.543 | 0 | 100 | 0 | 0 | 100 |
 | map_30 | 100 | 4147.3519 | 42.8316 | 4075.7243 | 4150.3973 | 4210.7166 | 0 | 100 | 0 | 0 | 100 |
 | map_20 | 100 | 794.1546 | 12.2443 | 775.6018 | 794.305 | 809.5169 | 0 | 100 | 0 | 0 | 100 |
@@ -436,11 +543,17 @@ Distribución. `Z_por_planta` divide entre las plantas presentes (T + M), que en
 | 1ha | iii_serpentina_existentes | 644 | 658 | 773.8551 | 1.2016 | 1.1761 | 773.8551 | 206 | 248.903 | 210.6714 | 278.6455 | 5.0802 | 30.5551 | 0 |
 | 1ha | tabu_sin_existentes | 658 | 658 | 569.0427 | 0.8648 | 0.8648 | 569.0427 | 0 | 21.4722 | 180.7613 | 330.4777 | 4.8746 | 31.4569 | 0 |
 | 1ha | tabu_con_existentes | 644 | 658 | 561.0573 | 0.8712 | 0.8527 | 561.0573 | 13 | 36.4308 | 185.2749 | 304.167 | 4.4107 | 30.7739 | 0 |
+| 1ha | dsatur_sin_existentes | 658 | 658 | 775.6611 | 1.1788 | 1.1788 | 775.6611 | 254 | 328.924 | 128.6861 | 285.1544 | 7.8685 | 25.0281 | 0 |
+| 1ha | dsatur_con_existentes | 644 | 658 | 771.3697 | 1.1978 | 1.1723 | 771.3697 | 253 | 320.3116 | 145.5055 | 274.1828 | 7.0062 | 24.3636 | 0 |
 | map_27 | i_serpentina | 842 | 842 | 1032.927 | 1.2268 | 1.2268 | 806.9742 | 281 | 347.8633 | 284.7679 | 356.2206 | 4.6789 | 39.3963 | 0 |
 | map_27 | ii_serpentina_banda | 842 | 842 | 1072.1232 | 1.2733 | 1.2733 | 837.5962 | 320 | 383.1487 | 312.2077 | 334.7965 | 3.984 | 37.9862 | 0 |
 | map_27 | iii_serpentina_existentes | 823 | 842 | 1000.2116 | 1.2153 | 1.1879 | 781.4153 | 279 | 331.9876 | 265.7493 | 358.8671 | 6.3883 | 37.2193 | 0 |
 | map_27 | tabu_sin_existentes | 842 | 842 | 738.8838 | 0.8775 | 0.8775 | 577.253 | 0 | 28.6158 | 243.2081 | 419.9312 | 6.2732 | 40.8555 | 0 |
 | map_27 | tabu_con_existentes | 823 | 842 | 719.6483 | 0.8744 | 0.8547 | 562.2253 | 28 | 56.3957 | 236.1891 | 381.2185 | 6.4701 | 39.3749 | 0 |
+| map_27 | dsatur_sin_existentes | 842 | 842 | 986.6242 | 1.1718 | 1.1718 | 770.8001 | 295 | 400.5847 | 180.3535 | 362.87 | 10.6716 | 32.1444 | 0 |
+| map_27 | dsatur_con_existentes | 823 | 842 | 952.7232 | 1.1576 | 1.1315 | 744.315 | 264 | 342.1283 | 208.5082 | 360.0843 | 9.264 | 32.7385 | 0 |
+
+DSATUR por cuotas (§10): en 1ha, Z = 775.7 sin existentes y 771.4 con existentes, contra 569.0 y 561.1 del tabú y 749.5 (i) y 773.9 (iii) de la serpentina (con existentes, DSATUR queda +37.5 % frente al tabú); en map_27, Z = 986.6 sin existentes y 952.7 con existentes, contra 738.9 y 719.6 del tabú y 1032.9 (i) y 1000.2 (iii) de la serpentina (con existentes, DSATUR queda +32.4 % frente al tabú). La regla voraz asigna en cada paso la especie más barata con cuota disponible, así que las especies de menor competencia cruzada se agotan primero y Agave salmiana (≈ 27 % de las plantas) queda para los últimos pasos, donde se forma la mayoría de los pares inmediatos de la misma especie (en 1 ha, salmiana se agota en el paso 657 de 658 y aporta 235 de los 254 pares de la misma especie).
 
 Markov. Titular: las filas `compra_d` (compra del paso 2, ε = 0.1) y `compra_nominal` (q = D̄) proyectan la supervivencia sobre las plantas realmente plantadas, E[min(q_j, C⁺_j)] sobre los escenarios. Las filas `D_completo` suponen plantar todo D sin plantas existentes, que ya sobrevivieron al establecimiento, y por eso sobrestiman las vivas y la reposición (entre 24 % y 28 % en la reposición de 1 ha). Las vivas a 1 año de `compra_d` en 1 ha coinciden con la opción d de `practica_compra.csv`.
 
@@ -455,9 +568,254 @@ Markov. Titular: las filas `compra_d` (compra del paso 2, ε = 0.1) y `compra_no
 | map_27 | D_completo | D* | 842 | 769.6294 | 728.5255 | 122.0152 |
 | map_27 | D_completo | Dnom | 842 | 770.2886 | 728.5032 | 121.8973 |
 
+## Experimentación (1000 simulaciones)
+
+Valores esperados por hectárea sobre los escenarios (`results/experimentacion.csv`), con IC 95 % = media ± 1.96·sd/√n (sd muestral, n escenarios). X_j son las plantas existentes de la especie j y T = Σ X_j; C_j = max(D*_j − X_j, 0) son las plantas que hay que suministrar para completar D*; q_j es la compra del paso 2 (ε = 0.1, π = 2c), constante; n_j = min(q_j, C_j) son las plantas que realmente se suministran y plantan. Z es la competencia del acomodo del paso 3 (con existentes) y Z_nivel1..5 y Z_otro su reparto por nivel de competencia. Las magnitudes de Monte Carlo usan los 1000 escenarios; Z usa los escenarios del paso 3 (columna n): 1000 en 1 ha y P1 (map_27), mientras que las otras 29 instancias usan 100 escenarios del paso 3 (`paso3_resumen.csv`).
+
+### 1ha
+
+- E[T]/ha (existentes) = 129.47, IC 95 % [129.26, 129.68], n = 1000
+- E[Z]/ha (competencia) = 564.77, IC 95 % [564.11, 565.43], n = 1000
+
+Por especie y por ha:
+
+| especie | nombre | E[X_j]/ha | IC X | E[C_j]/ha | IC C | q_j/ha | E[n_j]/ha | IC n |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | Agave lechuguilla | 8.24 | [8.06, 8.42] | 37.76 | [37.58, 37.94] | 38.00 | 36.75 | [36.64, 36.87] |
+| 1 | Agave salmiana | 38.22 | [37.89, 38.55] | 139.78 | [139.45, 140.11] | 140.00 | 137.79 | [137.59, 137.99] |
+| 2 | Agave scabra | 7.94 | [7.76, 8.11] | 30.06 | [29.89, 30.24] | 30.00 | 28.91 | [28.81, 29.02] |
+| 3 | Agave striata | 7.72 | [7.56, 7.88] | 38.28 | [38.12, 38.44] | 38.00 | 37.10 | [37.01, 37.19] |
+| 4 | Opuntia cantabrigiensis | 10.19 | [9.99, 10.38] | 42.81 | [42.62, 43.01] | 43.00 | 41.68 | [41.56, 41.80] |
+| 5 | Opuntia engelmannii | 8.09 | [7.92, 8.26] | 32.91 | [32.74, 33.08] | 33.00 | 31.86 | [31.76, 31.96] |
+| 6 | Opuntia robusta | 15.07 | [14.84, 15.30] | 64.93 | [64.70, 65.16] | 65.00 | 63.47 | [63.33, 63.61] |
+| 7 | Opuntia streptacantha | 12.50 | [12.29, 12.71] | 45.50 | [45.29, 45.71] | 46.00 | 44.39 | [44.25, 44.53] |
+| 8 | Prosopis laevigata | 16.39 | [16.15, 16.63] | 77.61 | [77.37, 77.85] | 78.00 | 76.25 | [76.10, 76.41] |
+| 9 | Yucca filifera | 5.11 | [4.97, 5.25] | 18.89 | [18.75, 19.03] | 19.00 | 18.06 | [17.97, 18.15] |
+| total |  | 129.47 |  | 528.53 |  | 530.00 | 516.27 |  |
+
+E[Z por nivel de competencia]/ha:
+
+| magnitud | E/ha | sd/ha | IC 95 % | n |
+| --- | --- | --- | --- | --- |
+| Z_nivel1 | 34.58 | 4.58 | [34.30, 34.86] | 1000 |
+| Z_nivel2 | 187.77 | 6.48 | [187.37, 188.18] | 1000 |
+| Z_nivel3 | 307.42 | 5.11 | [307.10, 307.74] | 1000 |
+| Z_nivel4 | 4.44 | 0.29 | [4.42, 4.46] | 1000 |
+| Z_nivel5 | 30.55 | 0.63 | [30.51, 30.59] | 1000 |
+| Z_otro | 0.00 | 0.00 | [0.00, 0.00] | 1000 |
+
+### map_27
+
+- E[T]/ha (existentes) = 129.17, IC 95 % [128.96, 129.37], n = 1000
+- E[Z]/ha (competencia) = 572.88, IC 95 % [572.29, 573.46], n = 1000
+
+Por especie y por ha:
+
+| especie | nombre | E[X_j]/ha | IC X | E[C_j]/ha | IC C | q_j/ha | E[n_j]/ha | IC n |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | Agave lechuguilla | 8.17 | [8.01, 8.32] | 37.92 | [37.77, 38.08] | 38.28 | 37.12 | [37.02, 37.23] |
+| 1 | Agave salmiana | 38.07 | [37.79, 38.36] | 138.49 | [138.20, 138.77] | 138.28 | 136.57 | [136.40, 136.73] |
+| 2 | Agave scabra | 7.88 | [7.73, 8.04] | 30.40 | [30.24, 30.55] | 30.47 | 29.46 | [29.36, 29.56] |
+| 3 | Agave striata | 7.77 | [7.62, 7.92] | 38.32 | [38.18, 38.47] | 38.28 | 37.36 | [37.27, 37.45] |
+| 4 | Opuntia cantabrigiensis | 10.13 | [9.96, 10.30] | 43.78 | [43.61, 43.95] | 43.75 | 42.69 | [42.58, 42.79] |
+| 5 | Opuntia engelmannii | 8.19 | [8.04, 8.34] | 32.44 | [32.29, 32.59] | 32.81 | 31.67 | [31.57, 31.77] |
+| 6 | Opuntia robusta | 14.96 | [14.75, 15.16] | 64.73 | [64.53, 64.93] | 64.84 | 63.49 | [63.37, 63.62] |
+| 7 | Opuntia streptacantha | 12.64 | [12.44, 12.83] | 45.18 | [44.99, 45.37] | 45.31 | 44.02 | [43.91, 44.14] |
+| 8 | Prosopis laevigata | 16.38 | [16.18, 16.58] | 78.15 | [77.95, 78.36] | 78.12 | 76.85 | [76.72, 76.97] |
+| 9 | Yucca filifera | 4.98 | [4.86, 5.10] | 19.24 | [19.12, 19.36] | 19.53 | 18.63 | [18.55, 18.71] |
+| total |  | 129.17 |  | 528.65 |  | 529.69 | 517.86 |  |
+
+E[Z por nivel de competencia]/ha:
+
+| magnitud | E/ha | sd/ha | IC 95 % | n |
+| --- | --- | --- | --- | --- |
+| Z_nivel1 | 35.65 | 4.23 | [35.38, 35.91] | 1000 |
+| Z_nivel2 | 191.39 | 5.67 | [191.04, 191.74] | 1000 |
+| Z_nivel3 | 310.27 | 4.42 | [309.99, 310.54] | 1000 |
+| Z_nivel4 | 4.59 | 0.26 | [4.57, 4.60] | 1000 |
+| Z_nivel5 | 30.98 | 0.56 | [30.95, 31.02] | 1000 |
+| Z_otro | 0.00 | 0.00 | [0.00, 0.00] | 1000 |
+
+## Orden de plantación y transiciones
+
+Ejemplo de orden de plantación en 1 ha, sobre el patrón del paso 3 con ω = 0, en serpentina: filas por `fila` creciente; dentro de la fila, `col` creciente si la fila es par y decreciente si es impar; sólo plantas nuevas (las existentes y las posiciones vacías se saltan). Primeros 21 de 512 pasos (completo en `results/orden_plantacion_1ha.csv`, P1 en `orden_plantacion_map_27.csv`; figuras `orden_plantacion_*.png`):
+
+| paso | pos | fila | col | x | y | especie |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0 | 0 | 0 | 2.0946 | 1.814 | 1 |
+| 2 | 1 | 0 | 1 | 6.2838 | 1.814 | 7 |
+| 3 | 3 | 0 | 3 | 14.6621 | 1.814 | 1 |
+| 4 | 5 | 0 | 5 | 23.0404 | 1.814 | 7 |
+| 5 | 6 | 0 | 6 | 27.2296 | 1.814 | 1 |
+| 6 | 7 | 0 | 7 | 31.4188 | 1.814 | 7 |
+| 7 | 10 | 0 | 10 | 43.9863 | 1.814 | 1 |
+| 8 | 11 | 0 | 11 | 48.1755 | 1.814 | 7 |
+| 9 | 12 | 0 | 12 | 52.3646 | 1.814 | 1 |
+| 10 | 13 | 0 | 13 | 56.5538 | 1.814 | 7 |
+| 11 | 14 | 0 | 14 | 60.743 | 1.814 | 1 |
+| 12 | 15 | 0 | 15 | 64.9322 | 1.814 | 6 |
+| 13 | 16 | 0 | 16 | 69.1213 | 1.814 | 3 |
+| 14 | 17 | 0 | 17 | 73.3105 | 1.814 | 1 |
+| 15 | 20 | 0 | 20 | 85.878 | 1.814 | 9 |
+| 16 | 21 | 0 | 21 | 90.0672 | 1.814 | 2 |
+| 17 | 22 | 0 | 22 | 94.2564 | 1.814 | 7 |
+| 18 | 23 | 0 | 23 | 98.4455 | 1.814 | 1 |
+| 19 | 46 | 1 | 22 | 96.3509 | 5.4419 | 2 |
+| 20 | 45 | 1 | 21 | 92.1618 | 5.4419 | 8 |
+| 21 | 43 | 1 | 19 | 83.7834 | 5.4419 | 0 |
+
+### Matrices de transición (1 ha, todos los escenarios del paso 3)
+
+Cada planta es un estado (especie j = 0..9); filas j (de), columnas k (a). Son las matrices principales: acumulan los conteos de todos los escenarios del paso 3. Las de P1 (map_27) están en `results/transicion.csv`.
+
+Por orden de siembra: P(la siguiente planta sembrada es k | la actual es j):
+
+| de \ a | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0.014 | 0.274 | 0.034 | 0.021 | 0.110 | 0.050 | 0.232 | 0.059 | 0.178 | 0.027 |
+| 1 | 0.073 | 0.049 | 0.047 | 0.066 | 0.112 | 0.107 | 0.160 | 0.153 | 0.184 | 0.048 |
+| 2 | 0.043 | 0.217 | 0.020 | 0.036 | 0.075 | 0.029 | 0.185 | 0.171 | 0.196 | 0.026 |
+| 3 | 0.022 | 0.244 | 0.029 | 0.017 | 0.106 | 0.040 | 0.208 | 0.085 | 0.216 | 0.035 |
+| 4 | 0.099 | 0.364 | 0.053 | 0.091 | 0.013 | 0.011 | 0.048 | 0.071 | 0.188 | 0.062 |
+| 5 | 0.053 | 0.454 | 0.025 | 0.046 | 0.015 | 0.007 | 0.041 | 0.081 | 0.188 | 0.089 |
+| 6 | 0.134 | 0.346 | 0.085 | 0.124 | 0.032 | 0.020 | 0.024 | 0.035 | 0.175 | 0.026 |
+| 7 | 0.048 | 0.489 | 0.109 | 0.071 | 0.067 | 0.055 | 0.053 | 0.044 | 0.057 | 0.008 |
+| 8 | 0.089 | 0.332 | 0.074 | 0.106 | 0.099 | 0.076 | 0.145 | 0.035 | 0.032 | 0.012 |
+| 9 | 0.051 | 0.383 | 0.037 | 0.067 | 0.144 | 0.157 | 0.092 | 0.017 | 0.047 | 0.004 |
+
+Por vecindad inmediata: P(un vecino inmediato es k | la planta es j); incluye las existentes:
+
+| de \ a | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0.002 | 0.307 | 0.029 | 0.008 | 0.108 | 0.048 | 0.227 | 0.084 | 0.157 | 0.030 |
+| 1 | 0.088 | 0.019 | 0.058 | 0.081 | 0.112 | 0.105 | 0.164 | 0.122 | 0.201 | 0.052 |
+| 2 | 0.040 | 0.274 | 0.003 | 0.030 | 0.079 | 0.029 | 0.192 | 0.136 | 0.192 | 0.026 |
+| 3 | 0.008 | 0.291 | 0.022 | 0.002 | 0.100 | 0.041 | 0.208 | 0.108 | 0.184 | 0.036 |
+| 4 | 0.098 | 0.353 | 0.053 | 0.089 | 0.003 | 0.009 | 0.059 | 0.076 | 0.192 | 0.067 |
+| 5 | 0.056 | 0.434 | 0.025 | 0.047 | 0.012 | 0.002 | 0.052 | 0.089 | 0.191 | 0.091 |
+| 6 | 0.134 | 0.341 | 0.084 | 0.120 | 0.039 | 0.026 | 0.004 | 0.036 | 0.185 | 0.029 |
+| 7 | 0.076 | 0.384 | 0.090 | 0.095 | 0.076 | 0.068 | 0.056 | 0.005 | 0.133 | 0.018 |
+| 8 | 0.076 | 0.343 | 0.069 | 0.088 | 0.104 | 0.079 | 0.152 | 0.072 | 0.004 | 0.012 |
+| 9 | 0.059 | 0.353 | 0.037 | 0.068 | 0.145 | 0.151 | 0.097 | 0.038 | 0.050 | 0.002 |
+
+Distribución estacionaria de la matriz por vecindad contra la composición plantada (fracción de plantas por especie, existentes incluidas); diferencia absoluta máxima 0.014:
+
+| especie | pi_estacionaria | composicion_plantada | diferencia |
+| --- | --- | --- | --- |
+| 0 | 0.074 | 0.070 | 0.004 |
+| 1 | 0.259 | 0.273 | -0.014 |
+| 2 | 0.054 | 0.057 | -0.003 |
+| 3 | 0.072 | 0.069 | 0.003 |
+| 4 | 0.082 | 0.080 | 0.001 |
+| 5 | 0.063 | 0.062 | 0.001 |
+| 6 | 0.125 | 0.122 | 0.003 |
+| 7 | 0.082 | 0.088 | -0.006 |
+| 8 | 0.152 | 0.143 | 0.008 |
+| 9 | 0.038 | 0.036 | 0.002 |
+
+### ω = 0 (ejemplo de un solo escenario)
+
+Las mismas matrices sobre el patrón de ω = 0 (el del orden de plantación de arriba), sólo como ejemplo.
+
+Por orden de siembra: P(la siguiente planta sembrada es k | la actual es j):
+
+| de \ a | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0.079 | 0.237 | 0.026 | 0.000 | 0.184 | 0.026 | 0.184 | 0.079 | 0.158 | 0.026 |
+| 1 | 0.079 | 0.036 | 0.022 | 0.065 | 0.108 | 0.108 | 0.194 | 0.180 | 0.158 | 0.050 |
+| 2 | 0.000 | 0.333 | 0.042 | 0.083 | 0.042 | 0.000 | 0.167 | 0.083 | 0.208 | 0.042 |
+| 3 | 0.105 | 0.132 | 0.000 | 0.026 | 0.079 | 0.026 | 0.158 | 0.132 | 0.289 | 0.053 |
+| 4 | 0.070 | 0.302 | 0.140 | 0.047 | 0.000 | 0.047 | 0.047 | 0.140 | 0.209 | 0.000 |
+| 5 | 0.062 | 0.531 | 0.031 | 0.031 | 0.000 | 0.031 | 0.031 | 0.031 | 0.094 | 0.156 |
+| 6 | 0.109 | 0.375 | 0.094 | 0.125 | 0.031 | 0.016 | 0.031 | 0.031 | 0.172 | 0.016 |
+| 7 | 0.043 | 0.587 | 0.043 | 0.043 | 0.109 | 0.065 | 0.043 | 0.022 | 0.043 | 0.000 |
+| 8 | 0.086 | 0.343 | 0.043 | 0.157 | 0.100 | 0.071 | 0.186 | 0.014 | 0.000 | 0.000 |
+| 9 | 0.000 | 0.412 | 0.059 | 0.118 | 0.176 | 0.176 | 0.000 | 0.000 | 0.059 | 0.000 |
+
+Por vecindad inmediata: P(un vecino inmediato es k | la planta es j); incluye las existentes:
+
+| de \ a | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0.000 | 0.335 | 0.037 | 0.004 | 0.094 | 0.053 | 0.229 | 0.078 | 0.135 | 0.037 |
+| 1 | 0.088 | 0.011 | 0.064 | 0.074 | 0.107 | 0.108 | 0.174 | 0.111 | 0.208 | 0.054 |
+| 2 | 0.043 | 0.284 | 0.019 | 0.033 | 0.090 | 0.019 | 0.204 | 0.123 | 0.152 | 0.033 |
+| 3 | 0.004 | 0.278 | 0.028 | 0.008 | 0.081 | 0.036 | 0.202 | 0.137 | 0.202 | 0.024 |
+| 4 | 0.084 | 0.364 | 0.069 | 0.073 | 0.000 | 0.004 | 0.055 | 0.091 | 0.200 | 0.062 |
+| 5 | 0.057 | 0.441 | 0.017 | 0.039 | 0.004 | 0.009 | 0.048 | 0.092 | 0.197 | 0.096 |
+| 6 | 0.122 | 0.353 | 0.094 | 0.109 | 0.033 | 0.024 | 0.004 | 0.031 | 0.196 | 0.035 |
+| 7 | 0.065 | 0.350 | 0.088 | 0.116 | 0.085 | 0.071 | 0.048 | 0.020 | 0.136 | 0.020 |
+| 8 | 0.061 | 0.356 | 0.059 | 0.092 | 0.101 | 0.083 | 0.165 | 0.073 | 0.000 | 0.011 |
+| 9 | 0.065 | 0.360 | 0.050 | 0.043 | 0.122 | 0.158 | 0.115 | 0.043 | 0.043 | 0.000 |
+
+## Sensibilidades
+
+Cada variante cambia un solo parámetro frente a `base`: κ = 0.4 y 0.8 (`kappa_*`), radios × 0.75 y × 1.25 (`radios_*`), m × 0, 0.5 y 2 (`m_*`) y supervivencia a 2 años (`s2`). Cadena completa (paso 1 con γ*, Monte Carlo, paso 2, paso 3 y práctica) en 1 ha y P1 (map_27) con 100 escenarios del paso 3 en todas las variantes, incluida `base` (por eso su Z del paso 3 puede diferir del de la sección del paso 3); en map_21 (8 ha) sólo el paso 1, para comprobar que las conclusiones valen en un polígono grande. `cambio_*_pct` es el cambio porcentual contra `base` en la misma instancia (`results/sensibilidad.csv`; figura `sensibilidad.png`).
+
+| variante | instancia | suma_theta_d | z_opt_media | z_opt_sd | cambio_z_opt_pct | costo_compra | faltante_esperado | z_paso3_media | z_paso3_sd | cambio_z_paso3_pct | z_practica_iii | z_dsatur_con | z_tabu_con |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base | 1ha | 1344.434 | 571.4363 | 2.9881 | 0 | 12422 | 12.264 | 565.399 | 11.0873 | 0 | 773.8551 | 771.3697 | 561.0573 |
+| base | map_27 | 1723.453 | 739.6761 | 0.733 | 0 | 15892 | 13.805 | 734.0388 | 11.1025 | 0 | 1000.2116 | 952.7232 | 719.6483 |
+| base | map_21 | 10757.6788 | 4855.1533 | 7.7659 | 0 |  |  |  |  |  |  |  |  |
+| kappa_0.4 | 1ha | 1289.6873 | 398.9301 | 1.4631 | -30.1882 | 12414.5 | 12.264 | 404.5467 | 8.2686 | -28.4493 | 598.8711 | 649.7925 | 406.0806 |
+| kappa_0.4 | map_27 | 1652.5573 | 515.2921 | 1.3429 | -30.3354 | 15881 | 13.805 | 531.5554 | 9.1859 | -27.5848 | 777.4703 | 798.4897 | 530.3016 |
+| kappa_0.4 | map_21 | 10431.675 | 3339.3477 | 7.5019 | -31.2206 |  |  |  |  |  |  |  |  |
+| kappa_0.8 | 1ha | 1347.4812 | 758.8425 | 1.0313 | 32.7956 | 12437 | 12.264 | 741.2585 | 14.2338 | 31.1036 | 948.8391 | 904.7901 | 735.3849 |
+| kappa_0.8 | map_27 | 1729.9426 | 970.4891 | 2.1166 | 31.2046 | 15897 | 13.805 | 961.2395 | 14.1792 | 30.9521 | 1222.9529 | 1152.1764 | 937.265 |
+| kappa_0.8 | map_21 | 10804.4597 | 6387.9973 | 7.1026 | 31.5715 |  |  |  |  |  |  |  |  |
+| radios_0.75 | 1ha | 1347.8017 | 510.8662 | 0.8131 | -10.5996 | 12436 | 12.264 | 506.1019 | 10.0086 | -10.4876 | 688.1263 | 686.3109 | 504.8512 |
+| radios_0.75 | map_27 | 1727.3146 | 657.6205 | 3.2812 | -11.0935 | 15924 | 13.805 | 655.918 | 10.6437 | -10.6426 | 897.0084 | 851.299 | 648.8015 |
+| radios_0.75 | map_21 | 10791.3602 | 4291.7329 | 4.2119 | -11.6046 |  |  |  |  |  |  |  |  |
+| radios_1.25 | 1ha | 1304.7588 | 685.362 | 4.0883 | 19.9367 | 12417 | 12.264 | 678.7525 | 13.1222 | 20.0484 | 911.7406 | 857.1883 | 674.359 |
+| radios_1.25 | map_27 | 1673.0825 | 876.9075 | 1.4439 | 18.5529 | 15884.5 | 13.805 | 884.9543 | 13.599 | 20.5596 | 1161.2226 | 1080.319 | 857.7506 |
+| radios_1.25 | map_21 | 10413.5593 | 5816.8229 | 4.0505 | 19.8072 |  |  |  |  |  |  |  |  |
+| m_0 | 1ha | 0 | 572.2638 | 0.8706 | 0.1448 | 12422 | 12.264 | 563.6155 | 11.0684 | -0.3154 | 773.8551 | 755.8919 | 561.1651 |
+| m_0 | map_27 | 0 | 736.7895 | 2.504 | -0.3902 | 15892 | 13.805 | 731.8531 | 11.1548 | -0.2978 | 1000.2116 | 959.2301 | 716.9904 |
+| m_0 | map_21 | 0 | 4834.8046 | 3.3149 | -0.4191 |  |  |  |  |  |  |  |  |
+| m_0.5 | 1ha | 675.4904 | 572.1727 | 1.1553 | 0.1289 | 12422 | 12.264 | 563.3406 | 10.8009 | -0.3641 | 773.8551 | 755.8919 | 560.7347 |
+| m_0.5 | map_27 | 866.2834 | 735.9804 | 0.5592 | -0.4996 | 15892 | 13.805 | 732.1672 | 11.0584 | -0.255 | 1000.2116 | 959.2301 | 719.1739 |
+| m_0.5 | map_21 | 5414.3242 | 4835.065 | 3.1906 | -0.4138 |  |  |  |  |  |  |  |  |
+| m_2 | 1ha | 2559.9312 | 600.5786 | 2.258 | 5.0998 | 12444 | 12.264 | 599.5125 | 11.7193 | 6.0335 | 773.8551 | 822.2396 | 595.3904 |
+| m_2 | map_27 | 3265.5875 | 777.7338 | 1.6444 | 5.1452 | 15921 | 13.805 | 781.6569 | 11.9933 | 6.4871 | 1000.2116 | 1028.2391 | 765.9304 |
+| m_2 | map_21 | 20488.4144 | 5055.8588 | 9.7837 | 4.1339 |  |  |  |  |  |  |  |  |
+| s2 | 1ha | 2079.9107 | 573.2801 | 3.333 | 0.3227 | 12427 | 12.264 | 565.6766 | 11.027 | 0.0491 | 773.8551 | 773.8655 | 561.6218 |
+| s2 | map_27 | 2662.3479 | 739.5137 | 0.5622 | -0.022 | 15892 | 13.805 | 734.6306 | 11.2157 | 0.0806 | 1000.2116 | 954.2731 | 718.8017 |
+| s2 | map_21 | 16637.5144 | 4857.6546 | 8.6925 | 0.0515 |  |  |  |  |  |  |  |  |
+
+Composición D* por variante:
+
+| variante | instancia | D_0 | D_1 | D_2 | D_3 | D_4 | D_5 | D_6 | D_7 | D_8 | D_9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base | 1ha | 46 | 178 | 38 | 46 | 53 | 41 | 80 | 58 | 94 | 24 |
+| base | map_27 | 59 | 226 | 49 | 59 | 69 | 52 | 102 | 74 | 121 | 31 |
+| base | map_21 | 369 | 1412 | 303 | 369 | 431 | 333 | 642 | 461 | 756 | 188 |
+| kappa_0.4 | 1ha | 46 | 192 | 38 | 46 | 53 | 41 | 80 | 58 | 79 | 25 |
+| kappa_0.4 | map_27 | 59 | 249 | 49 | 59 | 69 | 52 | 102 | 74 | 99 | 30 |
+| kappa_0.4 | map_21 | 369 | 1496 | 303 | 369 | 431 | 334 | 642 | 461 | 633 | 226 |
+| kappa_0.8 | 1ha | 46 | 177 | 38 | 46 | 53 | 38 | 80 | 58 | 94 | 28 |
+| kappa_0.8 | map_27 | 59 | 226 | 49 | 56 | 69 | 51 | 102 | 74 | 121 | 35 |
+| kappa_0.8 | map_21 | 369 | 1412 | 303 | 346 | 431 | 317 | 642 | 461 | 756 | 227 |
+| radios_0.75 | 1ha | 46 | 178 | 38 | 46 | 53 | 35 | 80 | 60 | 94 | 28 |
+| radios_0.75 | map_27 | 59 | 228 | 49 | 59 | 69 | 44 | 102 | 75 | 121 | 36 |
+| radios_0.75 | map_21 | 369 | 1412 | 303 | 369 | 431 | 274 | 642 | 480 | 756 | 228 |
+| radios_1.25 | 1ha | 46 | 188 | 38 | 46 | 53 | 41 | 80 | 58 | 84 | 24 |
+| radios_1.25 | map_27 | 59 | 242 | 49 | 59 | 69 | 52 | 102 | 74 | 106 | 30 |
+| radios_1.25 | map_21 | 369 | 1511 | 303 | 369 | 431 | 334 | 642 | 461 | 656 | 188 |
+| m_0 | 1ha | 46 | 177 | 38 | 43 | 53 | 41 | 80 | 58 | 94 | 28 |
+| m_0 | map_27 | 59 | 226 | 49 | 54 | 69 | 52 | 102 | 74 | 121 | 36 |
+| m_0 | map_21 | 369 | 1412 | 303 | 328 | 431 | 334 | 642 | 461 | 756 | 228 |
+| m_0.5 | 1ha | 46 | 177 | 38 | 43 | 53 | 41 | 80 | 58 | 94 | 28 |
+| m_0.5 | map_27 | 59 | 226 | 49 | 54 | 69 | 52 | 102 | 74 | 121 | 36 |
+| m_0.5 | map_21 | 369 | 1412 | 303 | 328 | 431 | 334 | 642 | 461 | 756 | 228 |
+| m_2 | 1ha | 46 | 200 | 38 | 46 | 53 | 35 | 80 | 58 | 78 | 24 |
+| m_2 | map_27 | 58 | 258 | 49 | 59 | 69 | 44 | 102 | 74 | 99 | 30 |
+| m_2 | map_21 | 369 | 1565 | 303 | 369 | 431 | 316 | 642 | 461 | 620 | 188 |
+| s2 | 1ha | 46 | 179 | 38 | 46 | 53 | 40 | 80 | 58 | 94 | 24 |
+| s2 | map_27 | 59 | 227 | 49 | 59 | 69 | 52 | 102 | 74 | 121 | 30 |
+| s2 | map_21 | 369 | 1412 | 303 | 369 | 431 | 333 | 642 | 461 | 756 | 188 |
+
 ## Convergencia del tabú
 
-Tope escalado por tamaño de la malla: max_iter_efectivo = max(max_iter, iter_por_posicion·|V|) y max_sin_mejora_efectivo = max(max_sin_mejora, sin_mejora_por_posicion·|V|). Criterio: al menos 90 % de las búsquedas tabú terminan por `sin_mejora` en total y 80 % en cada instancia. Se cumple: 3382 de 3382 búsquedas (100.0 %) y el mínimo por instancia es 100.0 %.
+Tope escalado por tamaño de la malla: max_iter_efectivo = max(max_iter, iter_por_posicion·|V|) y max_sin_mejora_efectivo = max(max_sin_mejora, sin_mejora_por_posicion·|V|). Criterio: al menos 90 % de las búsquedas tabú terminan por `sin_mejora` en total y 80 % en cada instancia. Se cumple: 5182 de 5182 búsquedas (100.0 %) y el mínimo por instancia es 100.0 %.
 
 ### Motivos de paro
 
@@ -465,8 +823,8 @@ Por instancia, sobre todas las búsquedas del pipeline:
 
 | instancia | busquedas | paros_tope | paros_sin_mejora | frac_sin_mejora |
 | --- | --- | --- | --- | --- |
-| 1ha | 154 | 0 | 154 | 1 |
-| map_27 | 154 | 0 | 154 | 1 |
+| 1ha | 1054 | 0 | 1054 | 1 |
+| map_27 | 1054 | 0 | 1054 | 1 |
 | map_28 | 106 | 0 | 106 | 1 |
 | map_30 | 106 | 0 | 106 | 1 |
 | map_20 | 106 | 0 | 106 | 1 |
@@ -496,7 +854,7 @@ Por instancia, sobre todas las búsquedas del pipeline:
 | map_4 | 106 | 0 | 106 | 1 |
 | map_5 | 106 | 0 | 106 | 1 |
 | map_1 | 106 | 0 | 106 | 1 |
-| total | 3382 | 0 | 3382 | 1 |
+| total | 5182 | 0 | 5182 | 1 |
 
 ### Corrida de referencia
 
@@ -563,21 +921,21 @@ Leídos de `config/default.json`:
 
 ## Validación exacta
 
-Se corrió CP-SAT (OR-Tools) sobre 10 instancias pequeñas (7 del paso 3, ec. 24, y 3 del paso 1, ec. 21) con un límite de 600 s y 8 workers por formulación; ninguna se probó óptima en ese tiempo. En las 20 corridas CP-SAT arrancó con la mejor solución del tabú (de 10 semillas) como hint (`AddHint`). Primero se corrió la formulación básica y, donde no cerró, también la ajustada; la tabla tiene ambas filas. Los coeficientes enteros del modelo son round(γ·w·h·10 000) para los pares libre–libre; para los términos libre–fijo, el agregado por (v, j), (θ_j + γ·Σ w·h), redondeado una sola vez; y θ·10 000 en el paso 1. Z*, Z_TS y las brechas usan los coeficientes originales (error de redondeo máximo por coeficiente: 5.0e-05). Antes de comparar, el Z/objetivo de Python de cada solución del tabú se verificó contra el reportado por `tabu-val` de Rust, y el de cada solución de CP-SAT se reevaluó con `reto evaluar-val`; ambos coinciden a 1e-6.
+Se corrió CP-SAT (OR-Tools) sobre 10 instancias pequeñas (7 del paso 3, ec. 24, y 3 del paso 1, ec. 21) con un límite de 600 s y 8 workers en la básica y 32 en la ajustada; ninguna se probó óptima en ese tiempo. En las 20 corridas CP-SAT arrancó con la mejor solución del tabú (de 10 semillas) como hint (`AddHint`). Primero se corrió la formulación básica y, donde no cerró, también la ajustada; la tabla tiene ambas filas. Los coeficientes enteros del modelo son round(γ·w·h·10 000) para los pares libre–libre; para los términos libre–fijo, el agregado por (v, j), (θ_j + γ·Σ w·h), redondeado una sola vez; y θ·10 000 en el paso 1. Z*, Z_TS y las brechas usan los coeficientes originales (error de redondeo máximo por coeficiente: 5.0e-05). Antes de comparar, el Z/objetivo de Python de cada solución del tabú se verificó contra el reportado por `tabu-val` de Rust, y el de cada solución de CP-SAT se reevaluó con `reto evaluar-val`; ambos coinciden a 1e-6.
 
 Óptimo probado en 0 de 10 instancias (0 con la formulación básica y 0 con la ajustada).
 
-Sin óptimo probado: p1_a (cota 183.6430, incumbente 202.9292, ajustada), p1_b (cota 244.1465, incumbente 270.1126, ajustada), p1_c (cota 381.7119, incumbente 430.3189, ajustada), p3_a (cota 28.5206, incumbente 34.9464, ajustada), p3_b (cota 48.1291, incumbente 60.2890, ajustada), p3_c (cota 35.0971, incumbente 37.7158, ajustada), p3_d (cota 45.2391, incumbente 49.2267, ajustada), p3_e (cota 73.1512, incumbente 81.6954, ajustada), p3_f (cota 35.0029, incumbente 40.5758, ajustada), p3_g (cota 52.6801, incumbente 62.1755, ajustada). En ellas la brecha se mide contra la cota − tolerancia de redondeo (cota válida para el problema con coeficientes originales), así que es una cota superior de la brecha real; para cada instancia se toma la fila de óptimo probado o, si no la hay, la de mayor cota.
+Sin óptimo probado: p1_a (cota 187.5422, incumbente 202.9292, ajustada), p1_b (cota 246.1276, incumbente 270.1126, ajustada), p1_c (cota 384.1323, incumbente 430.3323, ajustada), p3_a (cota 28.9393, incumbente 34.9464, ajustada), p3_b (cota 48.2767, incumbente 60.2781, ajustada), p3_c (cota 35.9559, incumbente 37.7158, ajustada), p3_d (cota 45.8829, incumbente 49.2267, ajustada), p3_e (cota 74.9419, incumbente 81.7072, ajustada), p3_f (cota 36.5227, incumbente 40.5758, ajustada), p3_g (cota 54.6096, incumbente 62.1701, ajustada). En ellas la brecha se mide contra la cota − tolerancia de redondeo (cota válida para el problema con coeficientes originales), así que es una cota superior de la brecha real; para cada instancia se toma la fila de óptimo probado o, si no la hay, la de mayor cota.
 
-En esas filas la incumbente de CP-SAT queda entre 7.46 % y 25.3 % por encima de la cota, así que la brecha contra la cota está dominada por la debilidad de la cota más que por la calidad de las soluciones. La suma de los peores errores de redondeo por término en una solución (tolerancia del modelo escalado) es a lo más 0.031.
+En esas filas la incumbente de CP-SAT queda entre 4.89 % y 24.9 % por encima de la cota, así que la brecha contra la cota está dominada por la debilidad de la cota más que por la calidad de las soluciones. La suma de los peores errores de redondeo por término en una solución (tolerancia del modelo escalado) es a lo más 0.031.
 
-Brecha de la mejor semilla del tabú (contra el óptimo o la cota): máxima 25.4 % (p3_b), media 14.4 %. Brecha de la media de las semillas: máxima 27.2 %, media 14.8 %. Contra la incumbente de CP-SAT, la mejor semilla queda entre 0.00532 % y 0.0977 %.
+Brecha de la mejor semilla del tabú (contra el óptimo o la cota): máxima 25 % (p3_b), media 12.3 %. Brecha de la media de las semillas: máxima 26.8 %, media 12.6 %. Contra la incumbente de CP-SAT, la mejor semilla queda entre 0.00532 % y 0.106 %.
 
 La incumbente de CP-SAT mejora a la mejor semilla del tabú en 10 de 10 instancias (con los coeficientes originales).
 
 Fracción de semillas que alcanzan el valor de la incumbente (|Z_TS − Z*| ≤ 1e-6·max(1, Z*)) en las instancias sin óptimo probado, contra la incumbente de CP-SAT: p1_a: 0.0, p1_b: 0.0, p1_c: 0.0, p3_a: 0.0, p3_b: 0.0, p3_c: 0.0, p3_d: 0.0, p3_e: 0.0, p3_f: 0.0, p3_g: 0.0. En la tabla esta fracción sólo se muestra con óptimo probado (– si no): sin él no es significativa, porque en las filas básicas la incumbente puede ser la propia solución del hint del tabú.
 
-Paso 1: brecha_z = (γ·Z_TS − γ·Z*)/(γ·Z*), la competencia de la mejor semilla contra la de la incumbente de CP-SAT (no contra el óptimo): p1_a: 0.0103 %, p1_b: 0.0407 %, p1_c: 0.028 %. Especies con L_j < U_j (n_especies_libres): p1_a: 1, p1_b: 1, p1_c: 4. En p1_a, p1_b sólo hay una especie libre y Σ D_j = D_tot está fijo, así que la composición queda determinada y Σθ·D es constante: esas instancias validan sólo el acomodo.
+Paso 1: brecha_z = (γ·Z_TS − γ·Z*)/(γ·Z*), la competencia de la mejor semilla contra la de la incumbente de CP-SAT (no contra el óptimo): p1_a: 0.0103 %, p1_b: 0.0407 %, p1_c: 0.0221 %. Especies con L_j < U_j (n_especies_libres): p1_a: 1, p1_b: 1, p1_c: 4. En p1_a, p1_b sólo hay una especie libre y Σ D_j = D_tot está fijo, así que la composición queda determinada y Σθ·D es constante: esas instancias validan sólo el acomodo.
 
 ∞ (p3_b, basica): la cota es ≤ 0, así que la brecha relativa contra la cota no está acotada.
 
@@ -586,25 +944,25 @@ Tabla completa (`results/validacion_exacta.csv`; en el paso 1 los z son el objet
 | id | modelo | formulacion | n_pos | existentes | n_especies_libres | aristas | variables | z_opt | cota | optimo_probado | estado | tiempo_cpsat_s | z_ts_mejor | z_ts_media | z_ts_sd | tiempo_ts_medio_s | brecha_mejor_% | brecha_media_% | brecha_vs_incumbente_% | frac_semillas_optimo | z_comp_opt | z_comp_ts_mejor | brecha_z_% | error_redondeo_max |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | p1_a | paso1 | basica | 49 | 0 | 1 | 316 | 18814 | 202.9361 | 131.0323 | False | FEASIBLE | 600.1348 | 202.9399 | 203.461 | 0.4093 | 0.0391 | 54.9 | 55.3 | 0.00192 | – | 34.9487 | 34.95 | 0.00371 | 4.8e-05 |
-| p1_a | paso1 | ajustada | 49 | 0 | 1 | 316 | 32090 | 202.9292 | 183.643 | False | FEASIBLE | 600.3335 | 202.9399 | 203.461 | 0.4093 | 0.0391 | 10.5 | 10.8 | 0.00532 | – | 34.9464 | 34.95 | 0.0103 | 4.8e-05 |
+| p1_a | paso1 | ajustada | 49 | 0 | 1 | 316 | 32090 | 202.9292 | 187.5422 | False | FEASIBLE | 602.9547 | 202.9399 | 203.461 | 0.4093 | 0.0424 | 8.22 | 8.5 | 0.00532 | – | 34.9464 | 34.95 | 0.0103 | 4.8e-05 |
 | p1_b | paso1 | basica | 64 | 0 | 1 | 432 | 25473 | 270.1699 | 166.9491 | False | FEASIBLE | 600.1988 | 270.1699 | 270.5203 | 0.2354 | 0.0591 | 61.8 | 62.1 | 0 | – | 47.0016 | 47.0016 | 0 | 4.8e-05 |
-| p1_b | paso1 | ajustada | 64 | 0 | 1 | 432 | 43840 | 270.1126 | 244.1465 | False | FEASIBLE | 600.5754 | 270.1699 | 270.5203 | 0.2354 | 0.0591 | 10.7 | 10.8 | 0.0212 | – | 46.9825 | 47.0016 | 0.0407 | 4.8e-05 |
+| p1_b | paso1 | ajustada | 64 | 0 | 1 | 432 | 43840 | 270.1126 | 246.1276 | False | FEASIBLE | 603.377 | 270.1699 | 270.5203 | 0.2354 | 0.0647 | 9.78 | 9.92 | 0.0212 | – | 46.9825 | 47.0016 | 0.0407 | 4.8e-05 |
 | p1_c | paso1 | basica | 100 | 0 | 4 | 718 | 41803 | 430.3823 | 196.7282 | False | FEASIBLE | 600.4217 | 430.3823 | 431.738 | 0.8791 | 0.0596 | 119 | 119 | 0 | – | 75.4453 | 75.4453 | 0 | 4.8e-05 |
-| p1_c | paso1 | ajustada | 100 | 0 | 4 | 718 | 72800 | 430.3189 | 381.7119 | False | FEASIBLE | 601.4923 | 430.3823 | 431.738 | 0.8791 | 0.0596 | 12.8 | 13.1 | 0.0147 | – | 75.4242 | 75.4453 | 0.028 | 4.8e-05 |
+| p1_c | paso1 | ajustada | 100 | 0 | 4 | 718 | 72800 | 430.3323 | 384.1323 | False | FEASIBLE | 605.8781 | 430.3823 | 431.738 | 0.8791 | 0.064 | 12 | 12.4 | 0.0116 | – | 75.4286 | 75.4453 | 0.0221 | 4.8e-05 |
 | p3_a | paso3 | basica | 49 | 0 |  | 316 | 18814 | 34.957 | 0.0343 | False | FEASIBLE | 600.1773 | 34.9629 | 35.1711 | 0.1766 | 0.0285 | 1.79e+05 | 1.8e+05 | 0.0168 | – | 34.957 | 34.9629 | – | 4.9e-05 |
-| p3_a | paso3 | ajustada | 49 | 0 |  | 316 | 32090 | 34.9464 | 28.5206 | False | FEASIBLE | 600.305 | 34.9629 | 35.1711 | 0.1766 | 0.0285 | 22.7 | 23.4 | 0.0473 | – | 34.9464 | 34.9629 | – | 4.9e-05 |
+| p3_a | paso3 | ajustada | 49 | 0 |  | 316 | 32090 | 34.9464 | 28.9393 | False | FEASIBLE | 607.0669 | 34.9629 | 35.1711 | 0.1766 | 0.0323 | 20.9 | 21.6 | 0.0473 | – | 34.9464 | 34.9629 | – | 4.9e-05 |
 | p3_b | paso3 | basica | 81 | 0 |  | 566 | 33136 | 60.3187 | 0 | False | FEASIBLE | 600.222 | 60.3352 | 61.1635 | 0.4918 | 0.0357 | ∞ | ∞ | 0.0274 | – | 60.3187 | 60.3352 | – | 4.9e-05 |
-| p3_b | paso3 | ajustada | 81 | 0 |  | 566 | 57410 | 60.289 | 48.1291 | False | FEASIBLE | 600.712 | 60.3352 | 61.1635 | 0.4918 | 0.0357 | 25.4 | 27.2 | 0.0766 | – | 60.289 | 60.3352 | – | 4.9e-05 |
+| p3_b | paso3 | ajustada | 81 | 0 |  | 566 | 57410 | 60.2781 | 48.2767 | False | FEASIBLE | 607.0008 | 60.3352 | 61.1635 | 0.4918 | 0.0375 | 25 | 26.8 | 0.0948 | – | 60.2781 | 60.3352 | – | 4.9e-05 |
 | p3_c | paso3 | basica | 49 | 10 |  | 316 | 9066 | 37.7158 | 17.7101 | False | FEASIBLE | 600.105 | 37.7193 | 37.7841 | 0.0894 | 0.0265 | 113 | 113 | 0.00936 | – | 37.7158 | 37.7193 | – | 5.0e-05 |
-| p3_c | paso3 | ajustada | 49 | 10 |  | 316 | 16551 | 37.7158 | 35.0971 | False | FEASIBLE | 600.2546 | 37.7193 | 37.7841 | 0.0894 | 0.0265 | 7.5 | 7.69 | 0.00936 | – | 37.7158 | 37.7193 | – | 5.0e-05 |
+| p3_c | paso3 | ajustada | 49 | 10 |  | 316 | 16551 | 37.7158 | 35.9559 | False | FEASIBLE | 602.3865 | 37.7193 | 37.7841 | 0.0894 | 0.0277 | 4.94 | 5.12 | 0.00936 | – | 37.7158 | 37.7193 | – | 5.0e-05 |
 | p3_d | paso3 | basica | 64 | 13 |  | 432 | 16131 | 49.2329 | 20.4933 | False | FEASIBLE | 600.1281 | 49.2329 | 49.2756 | 0.0305 | 0.0265 | 140 | 141 | 0 | – | 49.2329 | 49.2329 | – | 5.0e-05 |
-| p3_d | paso3 | ajustada | 64 | 13 |  | 432 | 27810 | 49.2267 | 45.2391 | False | FEASIBLE | 600.5912 | 49.2329 | 49.2756 | 0.0305 | 0.0265 | 8.86 | 8.96 | 0.0127 | – | 49.2267 | 49.2329 | – | 5.0e-05 |
+| p3_d | paso3 | ajustada | 64 | 13 |  | 432 | 27810 | 49.2267 | 45.8829 | False | FEASIBLE | 603.9429 | 49.2329 | 49.2756 | 0.0305 | 0.0271 | 7.34 | 7.43 | 0.0127 | – | 49.2267 | 49.2329 | – | 5.0e-05 |
 | p3_e | paso3 | basica | 100 | 20 |  | 718 | 26342 | 81.7564 | 28.4522 | False | FEASIBLE | 600.2151 | 81.7573 | 81.8452 | 0.1908 | 0.042 | 188 | 188 | 0.00116 | – | 81.7564 | 81.7573 | – | 5.0e-05 |
-| p3_e | paso3 | ajustada | 100 | 20 |  | 718 | 46000 | 81.6954 | 73.1512 | False | FEASIBLE | 600.5266 | 81.7573 | 81.8452 | 0.1908 | 0.042 | 11.8 | 11.9 | 0.0758 | – | 81.6954 | 81.7573 | – | 5.0e-05 |
+| p3_e | paso3 | ajustada | 100 | 20 |  | 718 | 46000 | 81.7072 | 74.9419 | False | FEASIBLE | 606.52 | 81.7573 | 81.8452 | 0.1908 | 0.045 | 9.13 | 9.25 | 0.0614 | – | 81.7072 | 81.7573 | – | 5.0e-05 |
 | p3_f | paso3 | basica | 64 | 13 |  | 432 | 16131 | 40.5758 | 14.4278 | False | FEASIBLE | 600.1422 | 40.5789 | 40.601 | 0.0111 | 0.0326 | 182 | 182 | 0.00767 | – | 40.5758 | 40.5789 | – | 5.0e-05 |
-| p3_f | paso3 | ajustada | 64 | 13 |  | 432 | 27810 | 40.5758 | 35.0029 | False | FEASIBLE | 600.5146 | 40.5789 | 40.601 | 0.0111 | 0.0326 | 16 | 16 | 0.00767 | – | 40.5758 | 40.5789 | – | 5.0e-05 |
+| p3_f | paso3 | ajustada | 64 | 13 |  | 432 | 27810 | 40.5758 | 36.5227 | False | FEASIBLE | 603.8827 | 40.5789 | 40.601 | 0.0111 | 0.0348 | 11.2 | 11.2 | 0.00767 | – | 40.5758 | 40.5789 | – | 5.0e-05 |
 | p3_g | paso3 | basica | 100 | 20 |  | 718 | 26342 | 62.2312 | 20.8987 | False | FEASIBLE | 600.2433 | 62.2362 | 62.3842 | 0.2434 | 0.0348 | 198 | 199 | 0.00802 | – | 62.2312 | 62.2362 | – | 5.0e-05 |
-| p3_g | paso3 | ajustada | 100 | 20 |  | 718 | 46000 | 62.1755 | 52.6801 | False | FEASIBLE | 600.9307 | 62.2362 | 62.3842 | 0.2434 | 0.0348 | 18.2 | 18.5 | 0.0977 | – | 62.1755 | 62.2362 | – | 5.0e-05 |
+| p3_g | paso3 | ajustada | 100 | 20 |  | 718 | 46000 | 62.1701 | 54.6096 | False | FEASIBLE | 604.895 | 62.2362 | 62.3842 | 0.2434 | 0.0358 | 14 | 14.3 | 0.106 | – | 62.1701 | 62.2362 | – | 5.0e-05 |
 
 ## Notas de interpretación
 
@@ -613,10 +971,7 @@ Tabla completa (`results/validacion_exacta.csv`; en el paso 1 los z son el objet
 
 ## No incluido / pendiente
 
-Lo siguiente de la especificación no se hizo y no tiene salida en `results/`:
-
-- Comparación con DSATUR (§10).
-- Sensibilidades: κ = 0.4 y 0.8, radios × 0.75 y × 1.25, m × 0, 0.5 y 2, y s2.
+Todo lo de la especificación tiene salida en `results/`.
 
 
 ## Figuras
@@ -633,3 +988,6 @@ Lo siguiente de la especificación no se hizo y no tiene salida en `results/`:
 - [Mapa socia vs. tabú (paso 3, ω = 0), P1](../figures/mapa_map_27.png)
 - [Práctica actual vs. modelo: compra de plantas](../figures/practica_compra.png)
 - [Práctica actual vs. tabú: distribución](../figures/practica_distribucion.png)
+- [Orden de plantación en serpentina (paso 3, ω = 0), 1 ha](../figures/orden_plantacion_1ha.png)
+- [Orden de plantación en serpentina (paso 3, ω = 0), P1](../figures/orden_plantacion_map_27.png)
+- [Sensibilidades: cambio de z_opt (paso 1) y de Z (paso 3) frente a base](../figures/sensibilidad.png)

@@ -48,6 +48,7 @@ if (-not $OmitirValidacion) {
 }
 Invoke-Paso $py @('python\practica_compra.py')
 Invoke-Paso $py @('python\markov.py')
+Invoke-Paso $py @('python\convergencia.py')
 Invoke-Paso $py @('python\figuras.py')
 Invoke-Paso $py @('python\resumen.py')
 Write-Host 'Listo: results/RESUMEN.md y figures/'

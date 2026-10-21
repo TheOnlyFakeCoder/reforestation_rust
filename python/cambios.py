@@ -21,6 +21,9 @@ ARCHIVOS = {
     "paso2_compra": "paso2_compra.csv",
     "practica_distribucion": "practica_distribucion.csv",
 }
+NOTA_PUNTOS = ("En la fila `reducción vs serpentina iii`, `antes` y `después` son porcentajes y "
+               "`cambio_pct` es la diferencia en puntos porcentuales (después − antes), no un "
+               "cambio relativo.")
 GAMMA_STAR = 3
 EPSILON = 0.1
 PI_FACTOR = 2
@@ -82,7 +85,8 @@ def tabla_cambios(antes, despues):
             return 100 * (1 - s["tabu_con_existentes"] / s["iii_serpentina_existentes"])
         ra, rd = reduccion(antes["practica_distribucion"]), reduccion(despues["practica_distribucion"])
         if ra is not None and rd is not None:
-            filas.append(_fila("reducción vs serpentina iii", inst, float(ra), float(rd)))
+            filas.append(_fila("reducción vs serpentina iii", inst, float(ra), float(rd),
+                               pct=float(rd) - float(ra)))
     return pd.DataFrame(filas, columns=["cifra", "instancia", "antes", "despues", "cambio_pct"])
 
 
@@ -104,7 +108,7 @@ def main(antes="be65ce0", despues="45c370f", salida="results/cambios_fase4.md"):
     tabu = leer_config()["tabu"]
     texto = "\n\n".join([
         f"# Cambios de la fase 4\n\nAntes: `{antes}`. Después: `{despues}`.",
-        "## Cifras antes y después\n\n" + resumen.tabla_md(tabla_cambios(a, d)),
+        "## Cifras antes y después\n\n" + NOTA_PUNTOS + "\n\n" + resumen.tabla_md(tabla_cambios(a, d)),
         "## Validación exacta (filas definitivas)\n\n" + _tabla_validacion(RAIZ / "results"),
         "## Parámetros del tabú\n\n" + resumen.tabla_md(pd.DataFrame([tabu])),
     ]) + "\n"

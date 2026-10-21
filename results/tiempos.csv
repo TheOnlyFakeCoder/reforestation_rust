@@ -1,0 +1,23 @@
+paso,instancias,segundos,fecha
+"cargo build --release --bin reto","",0.274,2026-10-21T23:56:08
+"reto datos","",0.014,2026-10-21T23:56:08
+"reto malla","",0.166,2026-10-21T23:56:08
+"python python\ajuste.py","",1.819,2026-10-21T23:56:10
+"reto paso1","1ha,map_27",17.564,2026-10-21T23:56:28
+"reto paso1 --solo-gamma-star","todas",385.921,2026-10-22T00:02:54
+"reto montecarlo","todas",0.604,2026-10-22T00:02:54
+"python python\paso2_compra.py","",8.367,2026-10-22T00:03:03
+"reto paso3","todas",1127.113,2026-10-22T00:21:50
+"reto practica","todas",1.549,2026-10-22T00:21:51
+"python python\transicion.py","",0.709,2026-10-22T00:21:52
+"python python\entorno.py","",5.708,2026-10-22T00:21:58
+"python python\tamano.py","",0.931,2026-10-22T00:21:59
+"python python\experimentacion.py","",0.704,2026-10-22T00:21:59
+"python python\sensibilidad.py","",369.205,2026-10-22T00:28:09
+"python python\practica_compra.py","",0.858,2026-10-22T00:28:09
+"python python\markov.py","",0.722,2026-10-22T00:28:10
+"python python\figuras.py","",5.636,2026-10-22T00:28:16
+"python python\resumen.py","",0.918,2026-10-22T00:28:17
+"reto instancias-val","",0.021,2026-10-22T02:17:35
+"reto tabu-val","",4.151,2026-10-22T02:17:39
+"python python\validacion_exacta.py --formulaciones ajustada --workers 32 --actualizar","",6056.732,2026-10-22T03:58:35

@@ -1,0 +1,5 @@
+instancia,map_id,composicion,costo_esperado,costo_sd,presupuesto,P_costo_mayor_B,violaciones_X_mayor_L,escenarios_C_negativo,especies_C_negativo
+1ha,0,nominal,12441.236,89.28422299867134,12500,0.265,0,0,0
+1ha,0,gamma_star,12382.736,89.28422299867134,12500,0.095,0,0,0
+map_27,27,nominal,15932.576,106.51767806209325,16000,0.27,0,0,0
+map_27,27,gamma_star,15851.076,106.51767806209325,16000,0.086,0,0,0

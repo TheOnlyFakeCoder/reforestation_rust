@@ -24,7 +24,7 @@ use reforestation::escenarios::{estadisticos, generar, percentil, resumir, Escen
 use reforestation::malla::Malla;
 use reforestation::paso1::{barrido_gamma, mejor_fila, FilaPaso1, Instancia};
 use reforestation::paso1::{patron_serpentina, reparar_a_banda};
-use reforestation::paso3::{correr_instancia, leer_compra, leer_patron, EntradaPaso3};
+use reforestation::paso3::{correr_instancia_detalle, leer_compra, leer_patron, EntradaPaso3};
 use reforestation::practica::{desglose, serpentina_con_existentes};
 use reforestation::reportes::{
     escribir_alcance, escribir_anillos, escribir_barrido_gamma, escribir_composicion_paso1,
@@ -32,6 +32,7 @@ use reforestation::reportes::{
     escribir_w, resumen_malla,
 };
 use reforestation::tabu::DEFAULT_ROW_SEQUENCE;
+use reforestation::transicion::{escribir_plantas, escribir_transicion};
 use reforestation::validacion::{
     coincide, construir, correr_tabu, evaluar, leer_asignaciones, phi_a_texto, red, violaciones,
     InstanciaVal, ESPECIFICACIONES,
@@ -633,6 +634,12 @@ fn paso3(
         "tiempo_s",
         "iteraciones",
         "motivo_paro",
+        "Z_nivel1",
+        "Z_nivel2",
+        "Z_nivel3",
+        "Z_nivel4",
+        "Z_nivel5",
+        "Z_otro",
     ])?;
     let mut res = csv::Writer::from_path(resultados_dir.join("paso3_resumen.csv"))?;
     res.write_record([
@@ -674,10 +681,29 @@ fn paso3(
         let params = config
             .tabu
             .params_para(config.semilla, instancia.malla.len());
-        let (filas, phi0, e0) =
-            correr_instancia(&entrada, config.n_escenarios_paso3_para(nombre), &params);
-        for f in &filas {
-            esc.write_record([
+        let w = matriz_w(&datos.especies, config.kappa);
+        let con_transicion = nombre == "1ha" || nombre == "map_27";
+        let salida = correr_instancia_detalle(
+            &entrada,
+            config.n_escenarios_paso3_para(nombre),
+            &params,
+            &datos.especies,
+            &w,
+            con_transicion,
+        );
+        let (filas, phi0, e0) = (salida.filas, salida.phi0, salida.e0);
+        if let Some(c) = &salida.conteos {
+            escribir_transicion(
+                &resultados_dir.join(format!("paso3_transicion_{nombre}.csv")),
+                c,
+            )?;
+            escribir_plantas(
+                &resultados_dir.join(format!("paso3_plantas_{nombre}.csv")),
+                c,
+            )?;
+        }
+        for (f, niv) in filas.iter().zip(&salida.niveles) {
+            let mut registro = vec![
                 f.instancia.clone(),
                 f.map_id.to_string(),
                 f.omega.to_string(),
@@ -690,7 +716,9 @@ fn paso3(
                 f.tiempo_s.to_string(),
                 f.iteraciones.to_string(),
                 f.motivo_paro.como_str().to_string(),
-            ])?;
+            ];
+            registro.extend(niv.iter().map(|x| x.to_string()));
+            esc.write_record(registro)?;
         }
         let z: Vec<f64> = filas.iter().map(|f| f.z).collect();
         let (media, sd) = estadisticos(&z);

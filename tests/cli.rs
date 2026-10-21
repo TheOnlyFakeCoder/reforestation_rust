@@ -514,12 +514,24 @@ fn paso3_y_practica_escriben_el_motivo_de_paro() {
         String::from_utf8_lossy(&salida.stderr)
     );
     let esc = encabezado_de(&resultados, "paso3_escenarios.csv");
-    assert!(esc.ends_with(",iteraciones,motivo_paro"), "{esc}");
+    assert!(esc.contains(",iteraciones,motivo_paro,Z_nivel1,"), "{esc}");
+    assert!(esc.ends_with(",Z_nivel5,Z_otro"), "{esc}");
     let texto = std::fs::read_to_string(resultados.join("paso3_escenarios.csv")).unwrap();
     for linea in texto.lines().skip(1) {
-        let motivo = linea.rsplit(',').next().unwrap();
+        let campos: Vec<&str> = linea.split(',').collect();
+        let motivo = campos[campos.len() - 7];
         assert!(["tope", "sin_mejora"].contains(&motivo), "{linea}");
+        let z: f64 = campos[7].parse().unwrap();
+        let niveles: f64 = campos[campos.len() - 6..]
+            .iter()
+            .map(|c| c.parse::<f64>().unwrap())
+            .sum();
+        assert!((z - niveles).abs() < 1e-6, "{linea}");
     }
+    let trans = std::fs::read_to_string(resultados.join("paso3_transicion_1ha.csv")).unwrap();
+    assert_eq!(trans.lines().count(), 201);
+    let plantas = std::fs::read_to_string(resultados.join("paso3_plantas_1ha.csv")).unwrap();
+    assert_eq!(plantas.lines().count(), 11);
     let res = encabezado_de(&resultados, "paso3_resumen.csv");
     assert!(res.ends_with(",paros_tope,paros_sin_mejora"), "{res}");
     let texto = std::fs::read_to_string(resultados.join("paso3_resumen.csv")).unwrap();

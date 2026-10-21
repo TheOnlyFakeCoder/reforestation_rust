@@ -674,7 +674,8 @@ fn paso3(
         let params = config
             .tabu
             .params_para(config.semilla, instancia.malla.len());
-        let (filas, phi0, e0) = correr_instancia(&entrada, config.n_escenarios_paso3, &params);
+        let (filas, phi0, e0) =
+            correr_instancia(&entrada, config.n_escenarios_paso3_para(nombre), &params);
         for f in &filas {
             esc.write_record([
                 f.instancia.clone(),

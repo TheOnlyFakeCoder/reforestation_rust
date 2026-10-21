@@ -13,6 +13,7 @@
   "presupuesto_ha": 12500.0,
   "n_escenarios": 1000,
   "n_escenarios_paso3": 100,
+  "escenarios_paso3_por_instancia": {"1ha": 1000, "map_27": 1000},
   "pi_factor": 2.0,
   "tabu": {
     "candidatos": 128,

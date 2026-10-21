@@ -1,5 +1,6 @@
 //! Parámetros del modelo, compartidos por Rust y Python vía `config/default.json`.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::Path;
 
@@ -38,6 +39,9 @@ pub struct Config {
     pub presupuesto_ha: f64,
     pub n_escenarios: usize,
     pub n_escenarios_paso3: usize,
+    /// Escenarios del paso 3 por instancia; lo que no esté aquí usa `n_escenarios_paso3`.
+    #[serde(default)]
+    pub escenarios_paso3_por_instancia: BTreeMap<String, usize>,
     /// π_j = pi_factor·c_j.
     pub pi_factor: f64,
     pub tabu: ConfigTabu,
@@ -121,6 +125,10 @@ impl Default for Config {
             presupuesto_ha: 12_500.0,
             n_escenarios: 1000,
             n_escenarios_paso3: 100,
+            escenarios_paso3_por_instancia: BTreeMap::from([
+                ("1ha".to_string(), 1000),
+                ("map_27".to_string(), 1000),
+            ]),
             pi_factor: 2.0,
             tabu: ConfigTabu::default(),
         }
@@ -128,6 +136,14 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Escenarios del paso 3 para la instancia: el valor del mapa o `n_escenarios_paso3`.
+    pub fn n_escenarios_paso3_para(&self, nombre: &str) -> usize {
+        self.escenarios_paso3_por_instancia
+            .get(nombre)
+            .copied()
+            .unwrap_or(self.n_escenarios_paso3)
+    }
+
     /// Lee y valida un archivo de configuración.
     pub fn cargar(path: &Path) -> Result<Config, Box<dyn Error>> {
         let config = Config::leer(path)?;
@@ -194,6 +210,20 @@ impl Config {
         }
         if self.n_semillas < 1 {
             return Err("n_semillas debe ser ≥ 1".to_string());
+        }
+        if self.n_escenarios_paso3 > self.n_escenarios {
+            return Err(format!(
+                "n_escenarios_paso3 ({}) no puede exceder n_escenarios ({})",
+                self.n_escenarios_paso3, self.n_escenarios
+            ));
+        }
+        for (nombre, n) in &self.escenarios_paso3_por_instancia {
+            if *n > self.n_escenarios {
+                return Err(format!(
+                    "escenarios_paso3_por_instancia[{nombre}] ({n}) no puede exceder                      n_escenarios ({})",
+                    self.n_escenarios
+                ));
+            }
         }
         let t = &self.tabu;
         for (nombre, valor) in [
@@ -456,5 +486,49 @@ mod tests {
         assert_eq!(c.tabu.params_para(1, 1000).max_iter, 100_000);
         c.aplicar(r#"tabu={"iter_por_posicion":0}"#).unwrap();
         assert_eq!(c.tabu.params_para(1, 100_000).max_iter, 20_000);
+    }
+
+    #[test]
+    fn escenarios_paso3_por_instancia_por_defecto() {
+        let c = Config::default();
+        assert_eq!(c.n_escenarios_paso3_para("1ha"), 1000);
+        assert_eq!(c.n_escenarios_paso3_para("map_27"), 1000);
+        assert_eq!(c.n_escenarios_paso3_para("map_3"), 100);
+        let del_archivo = Config::cargar(std::path::Path::new("config/default.json")).unwrap();
+        assert_eq!(
+            del_archivo.escenarios_paso3_por_instancia,
+            c.escenarios_paso3_por_instancia
+        );
+    }
+
+    #[test]
+    fn set_mapa_vacio_deja_100_en_todas() {
+        let mut c = Config::default();
+        c.aplicar("escenarios_paso3_por_instancia={}").unwrap();
+        for nombre in ["1ha", "map_27", "map_3"] {
+            assert_eq!(c.n_escenarios_paso3_para(nombre), 100);
+        }
+    }
+
+    #[test]
+    fn validar_rechaza_paso3_mayor_que_mc() {
+        let mut c = Config::default();
+        c.escenarios_paso3_por_instancia.insert("1ha".into(), 1001);
+        let error = c.validar().unwrap_err();
+        assert!(error.contains("escenarios_paso3_por_instancia"), "{error}");
+        let c = Config {
+            n_escenarios: 50,
+            ..Config::default()
+        };
+        // El mapa por defecto (1000) excede 50, y el escalar (100) también.
+        assert!(c.validar().is_err());
+        let c = Config {
+            n_escenarios: 50,
+            n_escenarios_paso3: 51,
+            escenarios_paso3_por_instancia: Default::default(),
+            ..Config::default()
+        };
+        let error = c.validar().unwrap_err();
+        assert!(error.contains("n_escenarios_paso3"), "{error}");
     }
 }

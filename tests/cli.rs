@@ -434,7 +434,14 @@ fn montecarlo_escribe_escenarios_y_resumenes() {
     )
     .unwrap();
     let mut args = comunes("montecarlo");
-    args.extend(["--set", "n_escenarios=20"]);
+    args.extend([
+        "--set",
+        "n_escenarios=20",
+        "--set",
+        "n_escenarios_paso3=20",
+        "--set",
+        "escenarios_paso3_por_instancia={}",
+    ]);
     let salida = reto(&args);
     assert!(
         salida.status.success(),
@@ -494,7 +501,12 @@ fn paso3_y_practica_escriben_el_motivo_de_paro() {
     )
     .unwrap();
     let mut args = comunes("paso3");
-    args.extend(["--set", "n_escenarios_paso3=4"]);
+    args.extend([
+        "--set",
+        "n_escenarios_paso3=4",
+        "--set",
+        "escenarios_paso3_por_instancia={}",
+    ]);
     let salida = reto(&args);
     assert!(
         salida.status.success(),
@@ -579,4 +591,68 @@ fn calibrar_escribe_el_csv_con_el_encabezado_exacto() {
     let texto = std::fs::read_to_string(resultados.join("calibracion_tabu.csv")).unwrap();
     assert_eq!(texto.lines().count(), 3);
     assert!(String::from_utf8_lossy(&salida.stdout).contains("elegida"));
+}
+
+#[test]
+fn paso3_usa_los_escenarios_por_instancia() {
+    let datos = dir_temporal("por_inst_datos");
+    let resultados = dir_temporal("por_inst_resultados");
+    assert!(reto(&["datos", "--datos", datos.to_str().unwrap()])
+        .status
+        .success());
+    let comunes = |sub: &'static str| {
+        vec![
+            sub,
+            "--datos",
+            datos.to_str().unwrap(),
+            "--resultados",
+            resultados.to_str().unwrap(),
+            "--instancias",
+            "1ha",
+            "--set",
+            TABU_CORTO,
+        ]
+    };
+    let mut args = comunes("paso1");
+    args.extend(["--solo-gamma-star", "--set", "n_semillas=1"]);
+    assert!(reto(&args).status.success());
+    std::fs::write(
+        resultados.join("mc_params.json"),
+        r#"{"mu":129.0,"sigma":3.3,"p_hat":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]}"#,
+    )
+    .unwrap();
+    let q: Vec<String> = [42, 196, 42, 42, 49, 38, 73, 64, 86, 26]
+        .iter()
+        .map(|x| x.to_string())
+        .collect();
+    let cabecera: String = (0..10).map(|j| format!(",q_{j}")).collect();
+    std::fs::write(
+        resultados.join("paso2_compra.csv"),
+        format!(
+            "instancia,epsilon,pi_factor{cabecera}
+1ha,0.1,2.0,{}
+",
+            q.join(",")
+        ),
+    )
+    .unwrap();
+    let mut args = comunes("paso3");
+    args.extend([
+        "--set",
+        "n_escenarios=20",
+        "--set",
+        "n_escenarios_paso3=5",
+        "--set",
+        r#"escenarios_paso3_por_instancia={"1ha":12}"#,
+    ]);
+    let salida = reto(&args);
+    assert!(
+        salida.status.success(),
+        "{}",
+        String::from_utf8_lossy(&salida.stderr)
+    );
+    let texto = std::fs::read_to_string(resultados.join("paso3_resumen.csv")).unwrap();
+    let campos: Vec<&str> = texto.lines().nth(1).unwrap().split(',').collect();
+    assert_eq!(campos[0], "1ha");
+    assert_eq!(campos[2], "12", "{texto}");
 }

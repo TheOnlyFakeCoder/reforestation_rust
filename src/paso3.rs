@@ -287,3 +287,59 @@ pub fn leer_compra(
     )
     .into())
 }
+
+#[cfg(test)]
+mod tests_escenarios {
+    use super::*;
+    use crate::config::Config;
+    use crate::datos::Datos;
+    use crate::paso1::{patron_serpentina, reparar_a_banda};
+    use crate::tabu::DEFAULT_ROW_SEQUENCE;
+
+    /// Los resultados de ω = 0 y de los primeros ω no dependen de cuántos escenarios se corran.
+    #[test]
+    fn omega0_no_depende_de_n() {
+        let datos = Datos::base();
+        let mut config = Config::default();
+        config.tabu.max_iter = 200;
+        config.tabu.max_sin_mejora = 50;
+        let inst = Instancia::nueva("1ha", 1.0, &datos, &config, 1.0, false);
+        let mut base = patron_serpentina(&inst.malla, DEFAULT_ROW_SEQUENCE, inst.d_tot);
+        reparar_a_banda(&mut base, &inst.banda);
+        let mut d = [0u32; N_ESPECIES];
+        for &c in &base {
+            if c > 0 {
+                d[c as usize - 1] += 1;
+            }
+        }
+        let mc = ParamsMc {
+            mu: 129.0,
+            sigma: 3.3,
+            p_hat: [0.1; N_ESPECIES],
+        };
+        let entrada = EntradaPaso3 {
+            instancia: &inst,
+            base: &base,
+            q: d,
+            d,
+            mc: &mc,
+            semilla: config.semilla,
+        };
+        let params = config.tabu.params_para(config.semilla, inst.malla.len());
+        let (f3, phi3, e3) = correr_instancia(&entrada, 3, &params);
+        let (f7, phi7, e7) = correr_instancia(&entrada, 7, &params);
+        assert_eq!((f3.len(), f7.len()), (3, 7));
+        assert_eq!(phi3, phi7);
+        assert_eq!(e3, e7);
+        for (a, b) in f3.iter().zip(&f7) {
+            assert_eq!(
+                (a.omega, a.caso, a.t, a.v_lib, a.m, a.z, a.z_por_planta),
+                (b.omega, b.caso, b.t, b.v_lib, b.m, b.z, b.z_por_planta)
+            );
+            assert_eq!(
+                (a.iteraciones, a.motivo_paro),
+                (b.iteraciones, b.motivo_paro)
+            );
+        }
+    }
+}

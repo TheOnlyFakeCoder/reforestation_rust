@@ -20,7 +20,7 @@
 - Instancias: `1ha` y `map_27` (= P1); `map_21` = polígono de 8 ha para la comprobación de sensibilidad.
 - Paso 3: 1000 escenarios en `1ha` y `map_27`, 100 en las demás (decisión del usuario).
 - Sensibilidades: variantes exactas `base`, `kappa_0.4` (`kappa=0.4`), `kappa_0.8`, `radios_0.75` (`factor_radios=0.75`), `radios_1.25`, `m_0` (`m_escala=0`), `m_0.5`, `m_2`, `s2` (`usar_s2=true`); cadena completa en 1ha y map_27 con **100** escenarios del paso 3 en todas las variantes (incluida `base`, para comparar en igualdad de condiciones); sólo paso 1 γ* en map_21.
-- Base "antes" de la tabla de cambios de la fase 4: commit `be65ce0`; "después": el commit con los resultados de la re-corrida de la fase 4 (lo hace el controlador antes de la Task 1; se pasa como argumento).
+- Base "antes" de la tabla de cambios de la fase 4: commit `be65ce0`; "después": `45c370f` (resultados de la re-corrida de la fase 4).
 
 ## Review Focus
 
@@ -135,6 +135,6 @@ Sólo el controlador; sin código nuevo salvo correcciones con prueba.
 - [ ] `cargo build --release`; `reto paso3 --instancias todas` (1000 escenarios en 1ha y map_27); `reto practica --instancias todas` (DSATUR en las 31).
 - [ ] `python\transicion.py`, `python\entorno.py`, `python\tamano.py`, `python\sensibilidad.py`, `python\practica_compra.py`, `python\markov.py`.
 - [ ] Validación: `python\validacion_exacta.py --formulaciones ajustada --workers 32 --actualizar` (≈ 1 h 40 min; nada más corriendo en paralelo).
-- [ ] `python\figuras.py`, `python\resumen.py`, `python\cambios.py --despues <commit de la re-corrida de la fase 4>`.
+- [ ] `python\figuras.py`, `python\resumen.py`, `python\cambios.py --despues 45c370f`.
 - [ ] Revisar que RESUMEN tenga cada punto de la adenda; commits de resultados por bloque (`chore(results): …`).
 - [ ] Revisión final de la rama (modelo más capaz); avisar al usuario con la tabla de cambios, la de validación y los números de la entrega. Sin push ni merge.

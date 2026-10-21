@@ -6,10 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from comun import RAIZ, leer_config
+from comun import RAIZ, RETO, leer_config
 import sensibilidad
-
-RETO = RAIZ / "target" / "release" / "reto.exe"
 
 
 def test_config_variante():

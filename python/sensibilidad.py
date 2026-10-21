@@ -12,10 +12,11 @@ import numpy as np
 import pandas as pd
 
 try:
-    from comun import RAIZ, leer_config
+    from comun import RAIZ, RETO, leer_config
     import paso2_compra
-except ImportError:  # ejecución como paquete
-    from python.comun import RAIZ, leer_config
+except ImportError:
+    # ejecución como paquete
+    from python.comun import RAIZ, RETO, leer_config
     from python import paso2_compra
 
 J = 10
@@ -138,7 +139,7 @@ def resumir(raiz):
     return df
 
 
-def main(reto=RAIZ / "target" / "release" / "reto.exe", raiz=RAIZ / "results" / "sensibilidad"):
+def main(reto=RETO, raiz=RAIZ / "results" / "sensibilidad"):
     raiz = Path(raiz)
     for nombre in VARIANTES:
         t0 = time.time()

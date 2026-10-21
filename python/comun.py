@@ -1,10 +1,14 @@
 """Lectura de datos y configuración compartida por los scripts de Python."""
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
 
 RAIZ = Path(__file__).resolve().parents[1]
+
+# Binario del CLI: reto.exe en Windows, reto en el resto (cargo build --release --bin reto).
+RETO = RAIZ / "target" / "release" / ("reto.exe" if os.name == "nt" else "reto")
 
 
 def leer_poligonos(datos=None):

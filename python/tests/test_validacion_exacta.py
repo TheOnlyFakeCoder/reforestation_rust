@@ -7,10 +7,9 @@ import pandas as pd
 import pytest
 
 import validacion_exacta as ve
-from comun import RAIZ
+from comun import RAIZ, RETO
 
 DIR_VAL = RAIZ / "results" / "validacion"
-RETO = RAIZ / "target" / "release" / "reto.exe"
 ACTIVAS = [0, 1, 2]
 
 

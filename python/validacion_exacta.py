@@ -27,14 +27,13 @@ import pandas as pd
 from ortools.sat.python import cp_model
 
 try:
-    from comun import RAIZ
+    from comun import RAIZ, RETO
 except ImportError:
-    from python.comun import RAIZ
+    from python.comun import RAIZ, RETO
 
 ESCALA = 10_000
 TOL_CONSISTENCIA = 1e-6
 N_ESPECIES = 10
-RETO = RAIZ / "target" / "release" / "reto.exe"
 WORKERS = os.cpu_count() or 8  # todos los hilos lógicos (CP-SAT reparte su portafolio entre ellos)
 COLUMNAS = [
     "id", "modelo", "formulacion", "hint", "n_pos", "existentes", "n_especies_libres", "aristas",

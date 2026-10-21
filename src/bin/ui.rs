@@ -10,10 +10,11 @@ use reforestation::busqueda_tabu::ParamsTabu;
 use reforestation::composicion::Banda;
 use reforestation::config::Config;
 use reforestation::datos::{Datos, N_ESPECIES};
-use reforestation::escenarios::{estadisticos, percentil, ParamsMc};
+use reforestation::escenarios::{estadisticos, generar, percentil, ParamsMc};
 use reforestation::malla::Posicion;
 use reforestation::objetivo::z_total;
 use reforestation::paso1::{patron_serpentina, reparar_a_banda, resolver_paso1, Instancia};
+use reforestation::paso2::{resolver_ple, EntradaPaso2, FilaPaso2};
 use reforestation::paso3::{self, Caso, EntradaPaso3, FilaPaso3};
 use reforestation::writer::{read_plants_file, read_polygons_file};
 use reforestation::{Plant, Polygon};
@@ -55,11 +56,13 @@ const MC_RESPALDO: ParamsMc = ParamsMc {
     ],
 };
 
-/// Qué malla se está mirando: el patrón de la banda (antes/después) o el paso 3.
+/// Qué malla se está mirando: el patrón de la banda (antes/después), la compra del paso 2 o el
+/// paso 3.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Vista {
     Antes,
     Despues,
+    Paso2,
     Paso3,
 }
 
@@ -103,6 +106,20 @@ struct Paso1View {
     presupuesto_ha: f64,
     iteraciones: usize,
     tiempo_s: f64,
+    /// Paso 2 (compra de plantas) sobre D*; error si no pudo resolverse.
+    paso2: Result<Paso2View, String>,
+}
+
+/// Resultado del paso 2 (compra de plantas por PLE con escenarios) para la UI.
+#[derive(Clone)]
+struct Paso2View {
+    fila: FilaPaso2,
+    costos: [f64; N_ESPECIES],
+    n_escenarios: usize,
+    pi_factor: f64,
+    presupuesto: f64,
+    /// "paso 2 CSV" si la fila viene de `results/paso2_compra.csv`; "PLE Rust" si se resolvió aquí.
+    fuente: &'static str,
 }
 
 /// Resultado del paso 3 (escenario 0 + resumen sobre todos los escenarios) para la UI.
@@ -169,6 +186,72 @@ fn leer_d_paso1(path: &Path, nombre: &str) -> Result<[u32; N_ESPECIES], String> 
         }
     }
     Err(format!("{nombre}: sin fila en {}", path.display()))
+}
+
+/// Fila de `results/paso2_compra.csv` (la compra oficial, escrita por Python/PuLP).
+fn leer_paso2_publicado(
+    path: &Path,
+    nombre: &str,
+    epsilon: f64,
+    pi_factor: f64,
+) -> Result<FilaPaso2, String> {
+    let mut lector =
+        csv::Reader::from_path(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let enc = lector.headers().map_err(|e| e.to_string())?.clone();
+    let columna = |nombre_col: &str| {
+        enc.iter()
+            .position(|h| h == nombre_col)
+            .ok_or_else(|| format!("falta la columna {nombre_col}"))
+    };
+    let (ci, ce, cp) = (
+        columna("instancia")?,
+        columna("epsilon")?,
+        columna("pi_factor")?,
+    );
+    let cq: Vec<usize> = (0..N_ESPECIES)
+        .map(|j| columna(&format!("q_{j}")))
+        .collect::<Result<_, String>>()?;
+    let cqv: Vec<usize> = (0..N_ESPECIES)
+        .map(|j| columna(&format!("q_voceador_{j}")))
+        .collect::<Result<_, String>>()?;
+    let ccosto = columna("costo")?;
+    let cpres = columna("presupuesto")?;
+    let ccabe = columna("cabe")?;
+    let cfalt = columna("faltante_esperado")?;
+    let csobr = columna("sobrante_esperado")?;
+    let cobj = columna("objetivo")?;
+    let ccosto_v = columna("costo_voceador")?;
+
+    for registro in lector.records() {
+        let r = registro.map_err(|e| e.to_string())?;
+        if &r[ci] != nombre
+            || (r[ce].parse::<f64>().map_err(|e| e.to_string())? - epsilon).abs() > 1e-9
+            || (r[cp].parse::<f64>().map_err(|e| e.to_string())? - pi_factor).abs() > 1e-9
+        {
+            continue;
+        }
+        // Python puede escribir los enteros como 12.0.
+        let entero = |k: usize| -> Result<u32, String> {
+            Ok(r[k].parse::<f64>().map_err(|e| e.to_string())?.round() as u32)
+        };
+        let flotante =
+            |k: usize| -> Result<f64, String> { r[k].parse::<f64>().map_err(|e| e.to_string()) };
+        return Ok(FilaPaso2 {
+            q: std::array::from_fn(|j| entero(cq[j]).expect("q_j")),
+            costo: flotante(ccosto).expect("costo"),
+            presupuesto: Some(flotante(cpres).expect("presupuesto")),
+            cabe: r[ccabe].eq_ignore_ascii_case("true"),
+            faltante_esperado: flotante(cfalt).expect("faltante"),
+            sobrante_esperado: flotante(csobr).expect("sobrante"),
+            objetivo: flotante(cobj).expect("objetivo"),
+            q_voceador: std::array::from_fn(|j| entero(cqv[j]).expect("q_voceador_j")),
+            costo_voceador: flotante(ccosto_v).expect("costo_voceador"),
+        });
+    }
+    Err(format!(
+        "{nombre}: sin fila (ε={epsilon}, π={pi_factor}) en {}",
+        path.display()
+    ))
 }
 
 /// Corre el paso 3 completo para una instancia (hilo de trabajo; no toca la UI).
@@ -293,6 +376,70 @@ fn contar_por_especie(phi: &[u8]) -> [u32; N_ESPECIES] {
     d
 }
 
+/// Paso 2 para la D* dada: usa la compra publicada en `results/paso2_compra.csv` si existe la
+/// fila (ε, π) del config; si no, resuelve el PLE en Rust con los escenarios de semilla fija.
+fn correr_paso2(
+    instancia: &Instancia,
+    d: &[u32; N_ESPECIES],
+    config: &Config,
+) -> Result<Paso2View, String> {
+    let resultados = Path::new("results");
+    let presupuesto = config.presupuesto_ha * instancia.area;
+    let costos = instancia.costos;
+
+    let publicada = resultados.join("paso2_compra.csv");
+    if let Ok(fila) = leer_paso2_publicado(
+        &publicada,
+        &instancia.nombre,
+        config.epsilon,
+        config.pi_factor,
+    ) {
+        return Ok(Paso2View {
+            fila,
+            costos,
+            n_escenarios: config.n_escenarios,
+            pi_factor: config.pi_factor,
+            presupuesto,
+            fuente: "paso 2 CSV",
+        });
+    }
+
+    let mc = ParamsMc::leer(&resultados.join("mc_params.json")).unwrap_or(MC_RESPALDO);
+    let n = config.n_escenarios.max(1);
+    let x: Vec<[u32; N_ESPECIES]> = (0..n)
+        .map(|omega| {
+            generar(
+                instancia.malla.len(),
+                instancia.area,
+                instancia.map_id,
+                omega,
+                config.semilla,
+                &mc,
+            )
+            .x
+        })
+        .collect();
+    let c = costos;
+    let pi = std::array::from_fn(|j| config.pi_factor * c[j]);
+    let fila = resolver_ple(&EntradaPaso2 {
+        d,
+        x: &x,
+        c: &c,
+        pi: &pi,
+        presupuesto: Some(presupuesto),
+        eta: 0.0,
+    })
+    .map_err(|e| e.to_string())?;
+    Ok(Paso2View {
+        fila,
+        costos: c,
+        n_escenarios: n,
+        pi_factor: config.pi_factor,
+        presupuesto,
+        fuente: "PLE Rust",
+    })
+}
+
 /// Corre el paso 1 (nuevo algoritmo, sin existentes fijas) para una instancia (hilo de trabajo).
 fn correr_paso1(
     nombre: String,
@@ -325,6 +472,10 @@ fn correr_paso1(
     let costo_inicial = suma(&instancia.costos, &d_inicial);
     let z_inicial = z_total(&phi_inicial, &instancia.grafo, &instancia.tabla);
 
+    let iteraciones = fila.iter_paso1 + fila.iter_opt;
+    let tiempo_s = fila.tiempo_paso1_s + fila.tiempo_opt_s;
+    let paso2 = correr_paso2(&instancia, &d, config);
+
     Ok(Paso1View {
         nombre,
         area,
@@ -349,8 +500,9 @@ fn correr_paso1(
         costo_ha: if area > 0.0 { costo / area } else { 0.0 },
         costo_inicial,
         presupuesto_ha: config.presupuesto_ha,
-        iteraciones: fila.iter_paso1 + fila.iter_opt,
-        tiempo_s: fila.tiempo_paso1_s + fila.tiempo_opt_s,
+        iteraciones,
+        tiempo_s,
+        paso2,
     })
 }
 
@@ -392,7 +544,8 @@ struct App {
 }
 
 impl App {
-    fn new() -> Self {
+    /// Carga datos/config sin lanzar el optimizador (lo usa `new` y los tests).
+    fn cargar() -> Self {
         let plants = read_plants_file("bins/plants.bin");
         let polygons = read_polygons_file("bins/polygons.bin");
         let visible = vec![true; plants.len()];
@@ -405,7 +558,7 @@ impl App {
             .as_ref()
             .map_or(10, |c| c.n_escenarios_paso3.clamp(1, 10));
 
-        let mut app = App {
+        App {
             plants,
             polygons,
             resultados,
@@ -425,7 +578,11 @@ impl App {
             paso3: None,
             paso3_status: "Pick a polygon and press \"Run paso 3\".".to_string(),
             paso3_receiver: None,
-        };
+        }
+    }
+
+    fn new() -> Self {
+        let mut app = Self::cargar();
         app.run_selected();
         app
     }
@@ -855,17 +1012,20 @@ impl App {
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("View:").strong());
             ui.selectable_value(&mut self.vista, Vista::Antes, "Before");
-            ui.selectable_value(&mut self.vista, Vista::Despues, "After");
+            ui.selectable_value(&mut self.vista, Vista::Despues, "Paso 1");
+            ui.selectable_value(&mut self.vista, Vista::Paso2, "Paso 2");
             ui.selectable_value(&mut self.vista, Vista::Paso3, "Paso 3");
             match self.vista {
                 Vista::Antes => ui.weak("serpentina (inicio del tabú)"),
-                Vista::Despues => ui.weak("paso 1: γ·Z + Σθ·D en la banda +10%"),
+                Vista::Despues => ui.weak("composición D* y patrón φ*: γ·Z + Σθ·D en banda ±10%"),
+                Vista::Paso2 => ui.weak("compra de plantas q: PLE con escenarios bajo presupuesto"),
                 Vista::Paso3 => ui.weak("existentes fijas + cuotas de compra"),
             }
         });
         ui.separator();
         match self.vista {
             Vista::Paso3 => self.center_paso3(ui),
+            Vista::Paso2 => self.center_paso2(ui),
             _ => self.center_banda(ui),
         }
     }
@@ -897,6 +1057,127 @@ impl App {
             view.phi.clone()
         };
         self.draw_malla_cells(ui, &view.posiciones, view.separacion, &phi, None);
+    }
+
+    /// Vista del paso 2: compra de plantas q (PLE con escenarios) bajo presupuesto.
+    fn center_paso2(&mut self, ui: &mut egui::Ui) {
+        let Some(view) = self.resultados[self.selected].clone() else {
+            ui.centered_and_justified(|ui| {
+                ui.label("No result yet. Click \"Run selected\" or \"Run all\".");
+            });
+            return;
+        };
+        let p2 = match &view.paso2 {
+            Ok(p2) => p2.clone(),
+            Err(error) => {
+                ui.centered_and_justified(|ui| {
+                    ui.label(format!("paso 2 failed: {error}"));
+                });
+                return;
+            }
+        };
+        let fila = &p2.fila;
+
+        ui.horizontal_wrapped(|ui| {
+            ui.strong(&view.nombre);
+            ui.label(format!("{:.2} ha", view.area));
+            ui.separator();
+            ui.weak(format!(
+                "fuente: {} | π = {:.1}·c | η = 0 | escenarios {}",
+                p2.fuente, p2.pi_factor, p2.n_escenarios
+            ));
+        });
+        ui.horizontal_wrapped(|ui| {
+            let dentro = fila.costo <= p2.presupuesto + 1e-9;
+            let budget_color = if dentro {
+                Color32::from_rgb(80, 180, 80)
+            } else {
+                Color32::from_rgb(220, 90, 90)
+            };
+            ui.colored_label(
+                budget_color,
+                format!(
+                    "compra ${:.0} ({:.0}/ha, budget {:.0}/ha) {}",
+                    fila.costo,
+                    if view.area > 0.0 {
+                        fila.costo / view.area
+                    } else {
+                        0.0
+                    },
+                    p2.presupuesto / view.area.max(1e-9),
+                    if dentro { "ok" } else { "OVER" }
+                ),
+            );
+            ui.separator();
+            ui.label(format!("objetivo ${:.2}", fila.objetivo));
+            ui.separator();
+            ui.label(format!(
+                "faltante {:.2} | sobrante {:.2}",
+                fila.faltante_esperado, fila.sobrante_esperado
+            ));
+        });
+        ui.horizontal_wrapped(|ui| {
+            ui.weak(format!(
+                "voceador: ${:.0} ({} plantas) | PLE: ${:.0} ({} plantas) | ahorro ${:.0}",
+                fila.costo_voceador,
+                fila.q_voceador.iter().sum::<u32>(),
+                fila.costo,
+                fila.q.iter().sum::<u32>(),
+                fila.costo_voceador - fila.costo
+            ));
+        });
+        ui.separator();
+        egui::ScrollArea::vertical()
+            .id_salt("paso2_counts")
+            .max_height(240.0)
+            .show(ui, |ui| {
+                self.paso2_counts_table(ui, &view, &p2);
+            });
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Grid:").strong());
+            ui.weak("composition D* (paso 1)   ·   colored = planted   ·   gray = empty");
+        });
+        self.draw_malla_cells(ui, &view.posiciones, view.separacion, &view.phi, None);
+    }
+
+    /// Tabla del paso 2: c_j, D*, q (PLE) y q (voceador) por especie.
+    fn paso2_counts_table(&self, ui: &mut egui::Ui, view: &Paso1View, p2: &Paso2View) {
+        let fila = &p2.fila;
+        egui::Grid::new("paso2_counts_grid")
+            .striped(true)
+            .num_columns(6)
+            .show(ui, |ui| {
+                ui.strong("species");
+                ui.strong("c_j");
+                ui.strong("D*");
+                ui.strong("q");
+                ui.strong("q voceador");
+                ui.strong("costo q");
+                ui.end_row();
+
+                for (index, plant) in self.plants.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        let (rect, _) = ui.allocate_exact_size(Vec2::splat(11.0), Sense::hover());
+                        ui.painter().rect_filled(rect, 2.0, species_color(index));
+                        ui.label(plant.get_specie());
+                    });
+                    ui.label(format!("{:.1}", p2.costos[index]));
+                    ui.label(format!("{}", view.d[index]));
+                    ui.label(format!("{}", fila.q[index]));
+                    ui.label(format!("{}", fila.q_voceador[index]));
+                    ui.label(format!("{:.0}", p2.costos[index] * fila.q[index] as f64));
+                    ui.end_row();
+                }
+
+                ui.strong("total");
+                ui.label(format!("{:.1}", p2.costos.iter().sum::<f64>()));
+                ui.strong(format!("{}", view.d.iter().sum::<u32>()));
+                ui.strong(format!("{}", fila.q.iter().sum::<u32>()));
+                ui.strong(format!("{}", fila.q_voceador.iter().sum::<u32>()));
+                ui.strong(format!("{:.0}", fila.costo));
+                ui.end_row();
+            });
     }
 
     fn center_paso3(&mut self, ui: &mut egui::Ui) {
@@ -1366,5 +1647,82 @@ mod tests {
         assert_eq!(plantados, view.fila.t + m);
         assert!(view.z_media > 0.0);
         assert!(view.z_p95 >= view.z_p50);
+    }
+
+    #[test]
+    fn paso2_ui_compra_cabe_en_presupuesto() {
+        let datos = Datos::cargar(Path::new("data")).expect("data/ cargado");
+        let mut config = Config::cargar(Path::new("config/default.json")).expect("config");
+        config.tabu.max_iter = 400;
+        config.tabu.max_sin_mejora = 80;
+
+        let view =
+            correr_paso1("1ha".to_string(), 1.0, &datos, &config).expect("paso 1 corre para 1ha");
+        let p2 = view.paso2.as_ref().expect("paso 2 corre para 1ha");
+
+        let fila = &p2.fila;
+        assert!(fila.cabe, "compra debe caber en el presupuesto");
+        assert!(
+            fila.costo <= p2.presupuesto + 1e-6,
+            "costo ${:.2} > presupuesto ${:.2}",
+            fila.costo,
+            p2.presupuesto
+        );
+        assert!(fila.q.iter().sum::<u32>() > 0, "q no trivial");
+        assert!(fila.objetivo >= fila.costo - 1e-9, "objetivo ≥ costo");
+        assert!(fila.faltante_esperado >= 0.0 && fila.sobrante_esperado >= 0.0);
+        assert!(fila.costo_voceador > 0.0, "voceador es la referencia");
+        assert_eq!(p2.pi_factor, config.pi_factor);
+        assert!(
+            p2.fuente == "paso 2 CSV" || p2.fuente == "PLE Rust",
+            "{}",
+            p2.fuente
+        );
+
+        // D* dentro de la banda, como en el paso 1.
+        for j in 0..N_ESPECIES {
+            assert!(
+                (view.banda.l[j]..=view.banda.u[j]).contains(&(view.d[j] as usize)),
+                "especie {j}: D* fuera de la banda"
+            );
+        }
+    }
+
+    #[test]
+    fn paso2_ui_lee_la_compra_publicada() {
+        let fila = leer_paso2_publicado(Path::new("results/paso2_compra.csv"), "1ha", 0.10, 2.0)
+            .expect("1ha tiene fila publicada (ε=0.1, π=2)");
+        assert!(fila.cabe);
+        assert_eq!(
+            fila.q.to_vec(),
+            vec![38, 140, 30, 38, 43, 33, 65, 46, 78, 19]
+        );
+        assert!((fila.costo - 12422.0).abs() < 1e-6);
+    }
+
+    /// Renderiza las cuatro vistas sin ventana: si `center_paso2` u otro panel panean mal, el
+    /// test falla en lugar de crashear la UI.
+    #[test]
+    fn las_cuatro_vistas_se_dibujan_sin_panico() {
+        let datos = Datos::cargar(Path::new("data")).expect("data/ cargado");
+        let mut config = Config::cargar(Path::new("config/default.json")).expect("config");
+        config.tabu.max_iter = 400;
+        config.tabu.max_sin_mejora = 80;
+        let view =
+            correr_paso1("1ha".to_string(), 1.0, &datos, &config).expect("paso 1 corre para 1ha");
+
+        let mut app = App::cargar();
+        app.selected = 0;
+        app.resultados[0] = Some(view);
+        app.polygons.truncate(1); // evita leer bins de más en el inspector
+
+        let ctx = egui::Context::default();
+        for vista in [Vista::Antes, Vista::Despues, Vista::Paso2, Vista::Paso3] {
+            app.vista = vista;
+            let salida = ctx.run_ui(egui::RawInput::default(), |ui| {
+                app.center(ui);
+            });
+            salida.drop_without_applying_deltas();
+        }
     }
 }

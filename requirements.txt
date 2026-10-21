@@ -3,6 +3,8 @@ scipy
 pandas
 matplotlib
 pulp
-highspy
+# ortools 9.15 empaqueta HiGHS 1.12.0 y ambas bibliotecas usan el SONAME
+# libhighs.so.1: si highspy es más nuevo, el primero en importarse rompe al otro.
+highspy==1.12.0
 ortools
 pytest

@@ -114,6 +114,16 @@ def test_validacion_exacta_seccion(tmp_path):
     assert "tolerancia" in t
 
 
+def test_validacion_exacta_workers_por_formulacion(tmp_path):
+    _validacion_sintetica(tmp_path)
+    ruta = tmp_path / "validacion_exacta.csv"
+    v = pd.read_csv(ruta)
+    v.loc[v["formulacion"] == "ajustada", "workers"] = 32
+    v.to_csv(ruta, index=False)
+    t = resumen._validacion(tmp_path)
+    assert "8 workers en la básica y 32 en la ajustada" in t
+
+
 def test_validacion_exacta_sin_csv(tmp_path):
     t = resumen._validacion(tmp_path)
     assert "no se ha corrido" in t

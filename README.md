@@ -57,9 +57,13 @@ $py = ".venv\Scripts\python.exe"
 ```
 
 `.\run_all.ps1 -OmitirValidacion` salta los tres pasos de la validación exacta. CP-SAT corre
-600 s por instancia con 8 workers en la formulación básica y, si no prueba el óptimo, otros
-600 s con la ajustada (10 instancias: hasta unas 3.5 h). `python\validacion_exacta.py` acepta
-`--tiempo S`, `--workers N`, `--ids p3_a,p1_c`, `--dir`, `--salida` y `--reto`. Antes de comparar
+600 s por instancia con todos los hilos lógicos (`--workers`, por defecto `os.cpu_count()`) en la
+formulación básica y, si no prueba el óptimo, otros 600 s con la ajustada (10 instancias: hasta unas
+3.5 h). `python\validacion_exacta.py` acepta `--tiempo S`, `--workers N`, `--ids p3_a,p1_c`,
+`--formulaciones ajustada` (en orden; la siguiente sólo si la anterior no cierra), `--actualizar`
+(conserva las filas de `--salida` que no se vuelven a correr), `--dir`, `--salida` y `--reto`. El
+CSV actual tiene la básica con 8 workers y la ajustada vuelta a correr con 32:
+`& $py python\validacion_exacta.py --formulaciones ajustada --workers 32 --actualizar`. Antes de comparar
 verifica que Python y `reto evaluar-val` den el mismo Z (1e-6); si no, escribe
 `results/validacion_exacta_discrepancias.txt` y sale con código 2. Para evaluar asignaciones a
 mano: `& $reto evaluar-val --inst results\validacion\inst_p3_a.json --phi CSV` (columna `phi` con

@@ -311,7 +311,12 @@ def _validacion(o):
     no = d[~d["optimo_probado"]]
     por_form = {f: int((opt["formulacion"] == f).sum()) for f in ("basica", "ajustada")}
     tl = ", ".join(f"{t:g}" for t in sorted(v["tiempo_limite_s"].unique()))
-    wk = ", ".join(str(int(w)) for w in sorted(v["workers"].unique()))
+    wk_form = {f: sorted(int(w) for w in g["workers"].unique()) for f, g in v.groupby("formulacion")}
+    if len({tuple(w) for w in wk_form.values()}) > 1:  # p. ej. la ajustada se volvió a correr con más hilos
+        wk = (", ".join(map(str, wk_form.get("basica", []))) + " workers en la básica y "
+              + ", ".join(map(str, wk_form.get("ajustada", []))) + " en la ajustada")
+    else:
+        wk = ", ".join(str(int(w)) for w in sorted(v["workers"].unique())) + " workers por formulación"
     n3, n1 = int((d["modelo"] == "paso3").sum()), int((d["modelo"] == "paso1").sum())
     i_max = d["brecha_mejor"].idxmax()
     semillas = sorted({len(pd.read_csv(t)) for t in (Path(o) / "validacion").glob("tabu_*.csv")})
@@ -319,7 +324,7 @@ def _validacion(o):
     hay_ajustada = (v["formulacion"] == "ajustada").any()
     partes = [
         f"Se corrió CP-SAT (OR-Tools) sobre {n} instancias pequeñas ({n3} del paso 3, ec. 24, y {n1} "
-        f"del paso 1, ec. 21) con un límite de {tl} s y {wk} workers por formulación"
+        f"del paso 1, ec. 21) con un límite de {tl} s y {wk}"
         + (f"; ninguna se probó óptima en ese tiempo" if len(opt) == 0 else "") + ". En las "
         f"{len(v)} corridas CP-SAT arrancó con la mejor solución del tabú{de_semillas} como hint "
         "(`AddHint`). "

@@ -37,3 +37,26 @@ Complementa `2026-10-16-entregable2-spec.md`; lo que no se dice aquí sigue esa 
    La re-corrida de la fase 4 (`run_all.ps1 -OmitirValidacion`) se hizo el 2026-10-20 y es la
    base de la fase 5; sus resultados no se reescriben salvo lo que cambia la fase 5 (paso 3 de
    1 ha y P1, práctica con DSATUR, salidas nuevas, RESUMEN y figuras).
+
+## Ajustes del usuario al plan (2026-10-20, tras revisarlo)
+
+1. Transiciones sobre los 1000 escenarios: `reto paso3` acumula, en 1 ha y map_27, los conteos
+   10×10 por vecindad inmediata (incluye existentes) y por orden de siembra en serpentina (salta
+   existentes y vacías) sobre todos los escenarios → `results/paso3_transicion_<inst>.csv`
+   (de, a, conteo, n, prob). Esas son las matrices principales; la de ω = 0 queda como ejemplo.
+   Prueba: la distribución estacionaria de la matriz por vecindad queda cerca de la composición
+   plantada.
+2. Plantas a suministrar: además de E[C_j] y q_j, E[n_j] = E[min(q_j, C_j)] por especie y por ha.
+   IC 95 % (media ± 1.96·sd/√n) en E[T]/ha, E[X_j]/ha, E[C_j]/ha, E[n_j]/ha y E[Z].
+3. Tiempos: `run_all.ps1` mide cada paso (Measure-Command) → `results/tiempos.csv`
+   (paso, instancias, segundos, fecha); RESUMEN lo muestra junto a "Entorno y software".
+4. entorno.py: tipo y velocidad de la RAM (Win32_PhysicalMemory: SMBIOSMemoryType, Speed,
+   Capacity por módulo), tipo de disco (Get-PhysicalDisk: MediaType) y hash del commit.
+5. tamano.py: (a) fila del modelo estocástico completo en forma extensiva (x, y replicadas por
+   |Ω| = 1000 más las variables del paso 2) para justificar la descomposición; (b) fila TOTAL en
+   `tamano_parametros.csv`; (c) D̄ además de D* en `tamano_problema.csv` (1 ha y map_27).
+6. Antes de `reto paso3 --instancias todas` con 1000 escenarios, comprobar que
+   `paso3_patron_<inst>_omega0.csv` y la fila ω = 0 de `paso3_escenarios.csv` salen idénticos al
+   pasar de 100 a 1000 escenarios; si no, avisar al usuario antes de seguir.
+7. (Opcional, aceptado) Z por nivel de competencia por escenario en `paso3_escenarios.csv`
+   (columnas al final) para reportar E[Z por nivel]/ha.

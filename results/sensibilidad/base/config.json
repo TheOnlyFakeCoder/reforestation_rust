@@ -1,0 +1,36 @@
+{
+  "d": 4.189171180993856,
+  "epsilon": 0.1,
+  "kappa": 0.6,
+  "factor_radios": 1.0,
+  "tolerancia": 1e-06,
+  "gammas": [
+    0.0,
+    0.1,
+    0.3,
+    1.0,
+    3.0,
+    10.0,
+    30.0,
+    100.0
+  ],
+  "gamma_star": 3.0,
+  "n_semillas": 3,
+  "semilla": 20261017,
+  "m_escala": 1.0,
+  "usar_s2": false,
+  "presupuesto_ha": 12500.0,
+  "n_escenarios": 1000,
+  "n_escenarios_paso3": 100,
+  "escenarios_paso3_por_instancia": {},
+  "pi_factor": 2.0,
+  "tabu": {
+    "candidatos": 128,
+    "tenure": 10,
+    "max_iter": 20000,
+    "max_sin_mejora": 3000,
+    "prob_intercambio": 0.5,
+    "iter_por_posicion": 300,
+    "sin_mejora_por_posicion": 8
+  }
+}

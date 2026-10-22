@@ -182,4 +182,73 @@ mod tests {
             "pares inmediatos de la misma especie (ambos sentidos)"
         );
     }
+
+    #[test]
+    fn dsatur_con_cuotas_de_sobra_llena_todo_y_respeta_cuotas() {
+        let (g, t, n) = caso(4, 4);
+        let cuotas = [10, 10, 5, 0, 0, 0, 0, 0, 0, 0];
+        assert!(cuotas.iter().sum::<usize>() > n);
+        let phi = dsatur_cuotas(&g, &t, &cuotas, &vec![0; n]);
+        assert!(phi.iter().all(|&f| f > 0));
+        let c = cuenta(&phi);
+        for j in 0..N_ESPECIES {
+            assert!(c[j] <= cuotas[j]);
+        }
+        assert_eq!(c.iter().sum::<usize>(), n);
+    }
+
+    #[test]
+    fn dsatur_primera_asignacion_desempata_por_mayor_cuota() {
+        let (g, t, n) = caso(4, 4);
+        let cuotas = [3, 9, 4, 0, 0, 0, 0, 0, 0, 0];
+        let phi = dsatur_cuotas(&g, &t, &cuotas, &vec![0; n]);
+        // Sin vecinos plantados todo empata en saturación y costo: la primera es la de más vecinos.
+        let u = (0..n)
+            .max_by_key(|&u| (g.vecinos(u).len(), std::cmp::Reverse(u)))
+            .unwrap();
+        assert_eq!(phi[u], 2);
+    }
+
+    #[test]
+    fn dsatur_las_fijas_cuentan_en_la_saturacion() {
+        // Una fija de la especie 1 con 5 vecinos: la saturación de sus vecinos debe adelantarlos
+        // y ninguno repite la especie 1 si hay otras con cuota.
+        let (g, t, n) = caso(6, 6);
+        let mut fijas = vec![0u8; n];
+        let centro = (0..n)
+            .max_by_key(|&u| (g.vecinos(u).len(), std::cmp::Reverse(u)))
+            .unwrap();
+        fijas[centro] = 1;
+        let cuotas = [11, 12, 12, 0, 0, 0, 0, 0, 0, 0];
+        let phi = dsatur_cuotas(&g, &t, &cuotas, &fijas);
+        for v in g.vecinos(centro) {
+            if v.anillo == 0 {
+                assert_ne!(phi[v.pos as usize], 1);
+            }
+        }
+        // Saturación alta primero: el primer vecino elegido es de un vecino de la fija.
+        let mut pares = 0;
+        for u in 0..n {
+            for v in g.vecinos(u) {
+                if v.anillo == 0 && phi[u] == phi[v.pos as usize] {
+                    pares += 1;
+                }
+            }
+        }
+        assert_eq!(pares, 0);
+    }
+
+    #[test]
+    fn dsatur_elige_primero_la_libre_saturada_por_una_fija() {
+        let (g, t, n) = caso(6, 6);
+        let mut fijas = vec![0u8; n];
+        fijas[0] = 1;
+        let cuotas = [0, 1, 0, 0, 0, 0, 0, 0, 0, 0];
+        let phi = dsatur_cuotas(&g, &t, &cuotas, &fijas);
+        let u = (1..n).find(|&u| phi[u] == 2).unwrap();
+        assert!(g
+            .vecinos(0)
+            .iter()
+            .any(|v| v.anillo == 0 && v.pos as usize == u));
+    }
 }

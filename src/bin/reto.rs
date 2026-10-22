@@ -20,11 +20,14 @@ use reforestation::calibracion::{calibrar, elegir};
 use reforestation::competencia::matriz_w;
 use reforestation::config::Config;
 use reforestation::datos::{Datos, N_ESPECIES};
+use reforestation::dsatur::dsatur_cuotas;
 use reforestation::escenarios::{estadisticos, generar, percentil, resumir, Escenario, ParamsMc};
 use reforestation::malla::Malla;
 use reforestation::paso1::{barrido_gamma, mejor_fila, FilaPaso1, Instancia};
 use reforestation::paso1::{patron_serpentina, reparar_a_banda};
-use reforestation::paso3::{correr_instancia_detalle, leer_compra, leer_patron, EntradaPaso3};
+use reforestation::paso3::{
+    correr_instancia_detalle, cuotas, leer_compra, leer_patron, EntradaPaso3,
+};
 use reforestation::practica::{desglose, serpentina_con_existentes};
 use reforestation::reportes::{
     escribir_alcance, escribir_anillos, escribir_barrido_gamma, escribir_composicion_paso1,
@@ -924,12 +927,37 @@ fn practica(
         // Motivo de paro de las dos variantes tabú, tomado de los CSV de los pasos 1 y 3.
         let motivo_sin = leer_motivo_paso1(resultados_dir, nombre, config.gamma_star);
         let motivo_con = leer_motivo_paso3_omega0(resultados_dir, nombre);
+        // DSATUR por cuotas: sin existentes (cuotas = D*) y con las existentes de ω = 0.
+        let (d_star, _, _) =
+            leer_composicion(&resultados_dir.join("paso1_composicion.csv"), nombre)?;
+        let cuotas_sin: [usize; N_ESPECIES] = std::array::from_fn(|j| d_star[j] as usize);
+        let dsatur_sin = dsatur_cuotas(
+            &inst.grafo,
+            &inst.tabla,
+            &cuotas_sin,
+            &vec![0u8; inst.malla.len()],
+        );
+        let q = leer_compra(
+            &resultados_dir.join("paso2_compra.csv"),
+            nombre,
+            config.epsilon,
+            config.pi_factor,
+        )?;
+        let (n_j, _, _) = cuotas(&q, &d_star, &e0.x, inst.malla.len() - e0.t);
+        let cuotas_con: [usize; N_ESPECIES] = std::array::from_fn(|j| n_j[j]);
+        let mut fijas = vec![0u8; inst.malla.len()];
+        for &(u, j) in &e0.posiciones {
+            fijas[u] = j + 1;
+        }
+        let dsatur_con = dsatur_cuotas(&inst.grafo, &inst.tabla, &cuotas_con, &fijas);
         let variantes = [
             ("i_serpentina", &i, String::new()),
             ("ii_serpentina_banda", &ii, String::new()),
             ("iii_serpentina_existentes", &iii, String::new()),
             ("tabu_sin_existentes", &sin, motivo_sin),
             ("tabu_con_existentes", &con, motivo_con),
+            ("dsatur_sin_existentes", &dsatur_sin, String::new()),
+            ("dsatur_con_existentes", &dsatur_con, String::new()),
         ];
         for (variante, phi, motivo) in variantes {
             let d = desglose(phi, &inst.grafo, &inst.tabla, &datos.especies, &w);

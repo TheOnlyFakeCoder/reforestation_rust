@@ -564,6 +564,25 @@ fn paso3_y_practica_escriben_el_motivo_de_paro() {
             assert_eq!(motivo, "", "{linea}");
         }
     }
+    let plantas = |v: &str| -> String {
+        texto
+            .lines()
+            .find(|l| l.split(',').nth(1) == Some(v))
+            .unwrap_or_else(|| panic!("falta la variante {v}"))
+            .split(',')
+            .nth(2)
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(texto.lines().skip(1).count(), 7);
+    assert_eq!(
+        plantas("dsatur_con_existentes"),
+        plantas("tabu_con_existentes")
+    );
+    assert_eq!(
+        plantas("dsatur_sin_existentes"),
+        plantas("tabu_sin_existentes")
+    );
 }
 
 #[test]

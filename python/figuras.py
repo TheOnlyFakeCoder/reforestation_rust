@@ -175,9 +175,19 @@ def fig_practica_distribucion(origen, salida, instancias=None):
     d = pd.read_csv(origen / "practica_distribucion.csv")
     d = d[d["instancia"].isin(instancias or INSTANCIAS)]
     insts = list(dict.fromkeys(d["instancia"]))
-    variantes = ["i_serpentina", "ii_serpentina_banda", "iii_serpentina_existentes",
-                 "tabu_sin_existentes", "tabu_con_existentes"]
-    etqs = ["i\nserpentina", "ii\nserp. banda", "iii\nserp. exist.", "tabú\nsin exist.", "tabú\ncon exist."]
+    todas = [("i_serpentina", "i\nserpentina", "#999999"),
+             ("ii_serpentina_banda", "ii\nserp. banda", "#999999"),
+             ("iii_serpentina_existentes", "iii\nserp. exist.", "#999999"),
+             ("tabu_sin_existentes", "tab\u00fa\nsin exist.", "#1b6ca8"),
+             ("tabu_con_existentes", "tab\u00fa\ncon exist.", "#1b9e77"),
+             ("dsatur_sin_existentes", "DSATUR\nsin exist.", "#7570b3"),
+             ("dsatur_con_existentes", "DSATUR\ncon exist.", "#e6ab02")]
+    # Las variantes DSATUR faltan en CSV de corridas anteriores: se omiten si no estan.
+    presentes = set(d["variante"])
+    todas = [t for t in todas if t[0] in presentes]
+    variantes = [t[0] for t in todas]
+    etqs = [t[1] for t in todas]
+    colores = [t[2] for t in todas]
     fig, axs = plt.subplots(len(insts), 2, figsize=(13, 4.6 * len(insts)), squeeze=False)
     niveles = [f"Z_nivel{k}" for k in range(1, 6)] + ["Z_otro"]
     col_niv = ["#1b6ca8", "#d95f02", "#1b9e77", "#7570b3", "#e6ab02", "#999999"]
@@ -185,7 +195,7 @@ def fig_practica_distribucion(origen, salida, instancias=None):
     for fila, inst in enumerate(insts):
         s = d[d["instancia"] == inst].set_index("variante").reindex(variantes)
         ax = axs[fila, 0]
-        ax.bar(x, s["Z"], color=["#999999"] * 3 + ["#1b6ca8", "#1b9e77"])
+        ax.bar(x, s["Z"], color=colores)
         for xi, z, p in zip(x, s["Z"], s["pares_inmediatos_misma_especie"]):
             ax.annotate(f"{z:.0f}\n{int(p)} pares", (xi, z), ha="center", va="bottom", fontsize=8)
         ax.set_xticks(x)

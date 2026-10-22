@@ -106,6 +106,8 @@ struct Paso1View {
     presupuesto_ha: f64,
     iteraciones: usize,
     tiempo_s: f64,
+    /// Origen de φ*: "paso 1 CSV" (patrón publicado) o "tabú" (resuelto aquí).
+    fuente: &'static str,
     /// Paso 2 (compra de plantas) sobre D*; error si no pudo resolverse.
     paso2: Result<Paso2View, String>,
 }
@@ -186,6 +188,55 @@ fn leer_d_paso1(path: &Path, nombre: &str) -> Result<[u32; N_ESPECIES], String> 
         }
     }
     Err(format!("{nombre}: sin fila en {}", path.display()))
+}
+
+/// (iteraciones, tiempo_s, objetivo) de la corrida oficial de `results/paso1_gamma_star.csv`
+/// para la fila de γ* que eligió `mejor_fila` (menor γ·Z_paso1 + Σθ·D entre las semillas).
+/// None si no hay fila; el patrón publicado puede mostrarse sin esas estadísticas.
+fn leer_stats_paso1(path: &Path, nombre: &str, gamma: f64) -> Option<(usize, f64, f64)> {
+    let mut lector = csv::Reader::from_path(path).ok()?;
+    let enc = lector.headers().ok()?.clone();
+    let col = |n: &str| enc.iter().position(|h| h == n);
+    let ci = col("instancia")?;
+    let cg = col("gamma")?;
+    let cz = col("z_paso1")?;
+    let cs = col("suma_theta_d")?;
+    let ci1 = col("iter_paso1")?;
+    let ci2 = col("iter_opt")?;
+    let ct1 = col("tiempo_paso1_s")?;
+    let ct2 = col("tiempo_opt_s")?;
+    let mut mejor: Option<(usize, f64, f64)> = None;
+    let mut mejor_obj = f64::INFINITY;
+    for registro in lector.records().flatten() {
+        let Ok(g) = registro[cg].parse::<f64>() else {
+            continue;
+        };
+        if &registro[ci] != nombre || (g - gamma).abs() > 1e-9 {
+            continue;
+        }
+        let Ok(z_paso1) = registro[cz].parse::<f64>() else {
+            continue;
+        };
+        let Ok(suma_theta_d) = registro[cs].parse::<f64>() else {
+            continue;
+        };
+        let objetivo = gamma * z_paso1 + suma_theta_d;
+        if objetivo >= mejor_obj {
+            continue;
+        }
+        let (Ok(i1), Ok(i2)) = (
+            registro[ci1].parse::<usize>(),
+            registro[ci2].parse::<usize>(),
+        ) else {
+            continue;
+        };
+        let (Ok(t1), Ok(t2)) = (registro[ct1].parse::<f64>(), registro[ct2].parse::<f64>()) else {
+            continue;
+        };
+        mejor_obj = objetivo;
+        mejor = Some((i1 + i2, t1 + t2, objetivo));
+    }
+    mejor
 }
 
 /// Fila de `results/paso2_compra.csv` (la compra oficial, escrita por Python/PuLP).
@@ -440,29 +491,21 @@ fn correr_paso2(
     })
 }
 
-/// Corre el paso 1 (nuevo algoritmo, sin existentes fijas) para una instancia (hilo de trabajo).
-fn correr_paso1(
+/// Construye el `Paso1View` compartido por el patrón publicado y la búsqueda tabú.
+#[allow(clippy::too_many_arguments)]
+fn vista_paso1(
+    instancia: &Instancia,
     nombre: String,
     area: f64,
-    datos: &Datos,
+    phi_inicial: Vec<u8>,
+    phi: Vec<u8>,
+    z: f64,
+    objetivo: f64,
+    iteraciones: usize,
+    tiempo_s: f64,
+    fuente: &'static str,
     config: &Config,
-) -> Result<Paso1View, String> {
-    let instancia = Instancia::nueva(
-        &nombre,
-        area,
-        datos,
-        config,
-        config.m_escala,
-        config.usar_s2,
-    );
-    let params: ParamsTabu = config
-        .tabu
-        .params_para(config.semilla, instancia.malla.len());
-
-    let mut phi_inicial = patron_serpentina(&instancia.malla, ROW_SEQUENCE, instancia.d_tot);
-    reparar_a_banda(&mut phi_inicial, &instancia.banda);
-    let (fila, phi) = resolver_paso1(&instancia, config.gamma_star, &params);
-
+) -> Paso1View {
     let d = contar_por_especie(&phi);
     let d_inicial = contar_por_especie(&phi_inicial);
     let suma = |v: &[f64; N_ESPECIES], c: &[u32; N_ESPECIES]| {
@@ -472,11 +515,7 @@ fn correr_paso1(
     let costo_inicial = suma(&instancia.costos, &d_inicial);
     let z_inicial = z_total(&phi_inicial, &instancia.grafo, &instancia.tabla);
 
-    let iteraciones = fila.iter_paso1 + fila.iter_opt;
-    let tiempo_s = fila.tiempo_paso1_s + fila.tiempo_opt_s;
-    let paso2 = correr_paso2(&instancia, &d, config);
-
-    Ok(Paso1View {
+    Paso1View {
         nombre,
         area,
         filas: instancia.malla.filas(),
@@ -490,20 +529,111 @@ fn correr_paso1(
         posiciones: instancia.malla.posiciones.clone(),
         separacion: instancia.malla.d,
         z_inicial,
-        z: fila.z_opt,
-        z_por_planta: fila.z_opt_por_planta,
-        mortalidad: fila.suma_theta_d,
+        z,
+        z_por_planta: if instancia.d_tot > 0 {
+            z / instancia.d_tot as f64
+        } else {
+            0.0
+        },
+        mortalidad: suma(&instancia.theta, &d),
         mortalidad_inicial: suma(&instancia.theta, &d_inicial),
-        gamma: fila.gamma,
-        objetivo: fila.objetivo_paso1,
+        gamma: config.gamma_star,
+        objetivo,
         costo,
         costo_ha: if area > 0.0 { costo / area } else { 0.0 },
         costo_inicial,
         presupuesto_ha: config.presupuesto_ha,
         iteraciones,
         tiempo_s,
-        paso2,
-    })
+        fuente,
+        paso2: correr_paso2(instancia, &d, config),
+    }
+}
+
+/// Paso 1 de una instancia: usa φ* publicado en `results/paso1_patron_<nombre>.csv` si existe y
+/// su largo coincide con la malla (pasa igual la validación que hace el paso 3); si no, o si
+/// `forzar_tabu`, resuelve la búsqueda tabú aquí.
+fn obtener_paso1(
+    nombre: String,
+    area: f64,
+    datos: &Datos,
+    config: &Config,
+    forzar_tabu: bool,
+) -> Result<Paso1View, String> {
+    let instancia = Instancia::nueva(
+        &nombre,
+        area,
+        datos,
+        config,
+        config.m_escala,
+        config.usar_s2,
+    );
+    let mut phi_inicial = patron_serpentina(&instancia.malla, ROW_SEQUENCE, instancia.d_tot);
+    reparar_a_banda(&mut phi_inicial, &instancia.banda);
+    let resultados = Path::new("results");
+
+    if !forzar_tabu {
+        let ruta_patron = resultados.join(format!("paso1_patron_{nombre}.csv"));
+        if let Ok(phi) = paso3::leer_patron(&ruta_patron) {
+            if phi.len() == instancia.malla.len() {
+                let d = contar_por_especie(&phi);
+                let z = z_total(&phi, &instancia.grafo, &instancia.tabla);
+                let suma_theta_d: f64 = (0..N_ESPECIES)
+                    .map(|j| instancia.theta[j] * d[j] as f64)
+                    .sum();
+                let stats = leer_stats_paso1(
+                    &resultados.join("paso1_gamma_star.csv"),
+                    &nombre,
+                    config.gamma_star,
+                )
+                .unwrap_or((0, 0.0, config.gamma_star * z + suma_theta_d));
+                let (iteraciones, tiempo_s, objetivo) = stats;
+                return Ok(vista_paso1(
+                    &instancia,
+                    nombre,
+                    area,
+                    phi_inicial,
+                    phi,
+                    z,
+                    objetivo,
+                    iteraciones,
+                    tiempo_s,
+                    "paso 1 CSV",
+                    config,
+                ));
+            }
+        }
+    }
+
+    let params: ParamsTabu = config
+        .tabu
+        .params_para(config.semilla, instancia.malla.len());
+    let (fila, phi) = resolver_paso1(&instancia, config.gamma_star, &params);
+    Ok(vista_paso1(
+        &instancia,
+        nombre,
+        area,
+        phi_inicial,
+        phi,
+        fila.z_opt,
+        fila.objetivo_paso1,
+        fila.iter_paso1 + fila.iter_opt,
+        fila.tiempo_paso1_s + fila.tiempo_opt_s,
+        "tabú",
+        config,
+    ))
+}
+
+/// Paso 1 sólo con búsqueda tabú (sin patrón publicado): `obtener_paso1(..., true)`. Sólo lo
+/// usan los tests; la UI llega al mismo camino cuando un botón fuerza la corrida.
+#[cfg(test)]
+fn correr_paso1(
+    nombre: String,
+    area: f64,
+    datos: &Datos,
+    config: &Config,
+) -> Result<Paso1View, String> {
+    obtener_paso1(nombre, area, datos, config, true)
 }
 
 fn main() -> eframe::Result<()> {
@@ -532,6 +662,8 @@ struct App {
     inspected: Option<usize>,
     receiver: Option<Receiver<(usize, Result<Paso1View, String>)>>,
     pending: usize,
+    /// Los botones Run fuerzan la búsqueda tabú en vez de leer el patrón publicado.
+    force_tabu: bool,
     status: String,
     custom_width: usize,
     custom_height: usize,
@@ -569,6 +701,7 @@ impl App {
             inspected: None,
             receiver: None,
             pending: 0,
+            force_tabu: false,
             status: "Press \"Run selected\" to optimize the highlighted polygon.".to_string(),
             custom_width: 30,
             custom_height: 30,
@@ -583,7 +716,8 @@ impl App {
 
     fn new() -> Self {
         let mut app = Self::cargar();
-        app.run_selected();
+        // Al arrancar muestra el patrón publicado si existe (paso 1 en ms, no el tabú).
+        app.run_selected(false);
         app
     }
 
@@ -697,16 +831,17 @@ impl App {
         }
     }
 
-    fn run_selected(&mut self) {
-        self.run_jobs(vec![self.selected]);
+    /// `forzar_tabu = false` usa el patrón publicado si existe; `true` resuelve con búsqueda tabú.
+    fn run_selected(&mut self, forzar_tabu: bool) {
+        self.run_jobs(vec![self.selected], forzar_tabu);
     }
 
-    fn run_all(&mut self) {
-        self.run_jobs((0..self.entry_count()).collect());
+    fn run_all(&mut self, forzar_tabu: bool) {
+        self.run_jobs((0..self.entry_count()).collect(), forzar_tabu);
     }
 
     /// Lanza el paso 1 (nuevo algoritmo, sin existentes fijas) para las entradas dadas.
-    fn run_jobs(&mut self, indices: Vec<usize>) {
+    fn run_jobs(&mut self, indices: Vec<usize>, forzar_tabu: bool) {
         if indices.is_empty() || self.receiver.is_some() {
             return;
         }
@@ -739,11 +874,18 @@ impl App {
         let (sender, receiver) = mpsc::channel();
         self.receiver = Some(receiver);
         self.pending = jobs.len();
-        self.status = format!("Solving {} instance(s) (paso 1)...", jobs.len());
+        self.status = if forzar_tabu {
+            format!("Solving {} instance(s) (paso 1)...", jobs.len())
+        } else {
+            format!(
+                "Loading {} instance(s) (paso 1: CSV publicado o tabú)...",
+                jobs.len()
+            )
+        };
 
         thread::spawn(move || {
             for (index, nombre, area) in jobs {
-                let resultado = correr_paso1(nombre, area, &datos, &config);
+                let resultado = obtener_paso1(nombre, area, &datos, &config, forzar_tabu);
                 if sender.send((index, resultado)).is_err() {
                     break;
                 }
@@ -761,8 +903,8 @@ impl App {
             match receiver.try_recv() {
                 Ok((index, Ok(view))) => {
                     self.status = format!(
-                        "{}: Z {:.2} -> {:.2}, $/ha {:.0}",
-                        view.nombre, view.z_inicial, view.z, view.costo_ha
+                        "{} [{}]: Z {:.2} -> {:.2}, $/ha {:.0}",
+                        view.nombre, view.fuente, view.z_inicial, view.z, view.costo_ha
                     );
                     self.resultados[index] = Some(view);
                     self.pending = self.pending.saturating_sub(1);
@@ -802,12 +944,17 @@ impl App {
 
         ui.horizontal(|ui| {
             if ui.button("Run selected").clicked() {
-                self.run_selected();
+                self.run_selected(self.force_tabu);
             }
             if ui.button("Run all").clicked() {
-                self.run_all();
+                self.run_all(self.force_tabu);
             }
         });
+        ui.checkbox(&mut self.force_tabu, "Force tabú re-solve")
+            .on_hover_text(
+            "Off: Run loads the published results/paso1_patron_*.csv (instant). On: Run re-runs \
+             the tabú search (0.3-7 s in release, much slower in debug).",
+        );
         if self.pending > 0 {
             ui.horizontal(|ui| {
                 ui.spinner();
@@ -1424,8 +1571,8 @@ impl App {
         if !show_before {
             ui.horizontal_wrapped(|ui| {
                 ui.weak(format!(
-                    "iters {} | {:.2}s | objetivo paso 1 {:.2}",
-                    view.iteraciones, view.tiempo_s, view.objetivo
+                    "{} | iters {} | {:.2}s | objetivo paso 1 {:.2}",
+                    view.fuente, view.iteraciones, view.tiempo_s, view.objetivo
                 ));
             });
         }
@@ -1609,6 +1756,77 @@ mod tests {
         assert!(view.z_por_planta > 0.0);
         assert!(view.costo_ha > 0.0 && view.costo_inicial > 0.0);
         assert!(view.iteraciones > 0);
+        assert_eq!(view.fuente, "tabú");
+    }
+
+    /// El arranque de la UI usa el patrón publicado: sin búsqueda tabú, φ* y D* son los oficiales.
+    #[test]
+    fn paso1_ui_usa_el_patron_publicado_de_map_27() {
+        let datos = Datos::cargar(Path::new("data")).expect("data/ cargado");
+        let config = Config::cargar(Path::new("config/default.json")).expect("config");
+        let area = datos
+            .poligonos
+            .iter()
+            .find(|p| p.map_id == 27)
+            .expect("map_27 existe")
+            .area;
+
+        let view = obtener_paso1("map_27".to_string(), area, &datos, &config, false)
+            .expect("paso 1 de map_27");
+
+        assert_eq!(view.fuente, "paso 1 CSV");
+        assert_eq!(view.phi.len(), 842);
+
+        // D* idéntica a la publicada en results/paso1_composicion.csv, dentro de la banda.
+        let d_pub = leer_d_paso1(Path::new("results/paso1_composicion.csv"), "map_27")
+            .expect("map_27 tiene fila publicada");
+        assert_eq!(view.d, d_pub);
+        assert_eq!(view.d.iter().map(|&x| x as usize).sum::<usize>(), 842);
+        for j in 0..N_ESPECIES {
+            assert!(
+                (view.banda.l[j]..=view.banda.u[j]).contains(&(view.d[j] as usize)),
+                "especie {j}: D_j = {} fuera de [{}..{}]",
+                view.d[j],
+                view.banda.l[j],
+                view.banda.u[j]
+            );
+        }
+
+        // Z calculada sobre el patrón publicado = Z* de results/paso1_gamma_star.csv (γ*, semilla
+        // de menor objetivo: 738.8838078374757).
+        assert!(
+            (view.z - 738.883_807_837_475_7).abs() < 1e-6,
+            "Z = {}",
+            view.z
+        );
+        // Iters de la corrida oficial elegida por menor objetivo (39 123 + 23 458); el tiempo es
+        // de la máquina que re-corrió el paso 1, así que sólo se pide que exista.
+        assert_eq!(view.iteraciones, 62_581);
+        assert!(
+            view.tiempo_s > 0.0 && view.tiempo_s < 60.0,
+            "{}",
+            view.tiempo_s
+        );
+        // El paso 2 también sale del CSV publicado.
+        assert_eq!(view.paso2.as_ref().expect("paso 2").fuente, "paso 2 CSV");
+    }
+
+    /// Sin patrón publicado (la malla "custom" no tiene uno), el mismo camino cae en el tabú.
+    #[test]
+    fn paso1_ui_sin_patron_publicado_resuelve_con_tabu() {
+        let datos = Datos::cargar(Path::new("data")).expect("data/ cargado");
+        let mut config = Config::cargar(Path::new("config/default.json")).expect("config");
+        config.tabu.max_iter = 400;
+        config.tabu.max_sin_mejora = 80;
+        config.tabu.iter_por_posicion = 0;
+        config.tabu.sin_mejora_por_posicion = 0;
+
+        let view = obtener_paso1("custom".to_string(), 1.0, &datos, &config, false)
+            .expect("tabú corre sin CSV");
+
+        assert_eq!(view.fuente, "tabú");
+        assert!(view.iteraciones > 0);
+        assert_eq!(view.phi.len(), view.posiciones.len());
     }
 
     #[test]
@@ -1724,5 +1942,19 @@ mod tests {
             });
             salida.drop_without_applying_deltas();
         }
+    }
+
+    /// El panel de controles se dibuja sin ventana y la casilla "Force tabú re-solve" arranca
+    /// apagada: al empezar, Run lee el patrón publicado en vez de re-correr la búsqueda tabú.
+    #[test]
+    fn controles_dibujan_con_la_casilla_de_tabu_apagada() {
+        let mut app = App::cargar();
+        assert!(!app.force_tabu, "el arranque no debe forzar el tabú");
+
+        let ctx = egui::Context::default();
+        let salida = ctx.run_ui(egui::RawInput::default(), |ui| {
+            app.controls(ui);
+        });
+        salida.drop_without_applying_deltas();
     }
 }

@@ -296,6 +296,16 @@ Launch the interactive UI:
 cargo run --bin ui
 ```
 
+At startup the UI loads the selected polygon from the published pattern
+(`results/paso1_patron_<name>.csv`), so it is ready in milliseconds — the status bar shows
+`paso 1 CSV`. **Run selected** / **Run all** do the same instant refresh by default; tick
+**Force tabú re-solve** (next to the buttons) to re-run the optimizer instead — status then shows
+`tabú`, and that solve is the slow part, so prefer `--release` for it:
+
+```sh
+cargo run --release --bin ui
+```
+
 The `cargo run ...` commands are the same in PowerShell/`cmd.exe` on Windows.
 
 ## UI overview
@@ -304,7 +314,9 @@ The `cargo run ...` commands are the same in PowerShell/`cmd.exe` on Windows.
   filter by species, and inspect an individual cell.
 - **Center:** summary statistics, the species count table, and the grid. Use the **Before / After**
   toggle to switch between the initial snake pattern and the optimized layout; the statistics
-  (placed, eco cost, `$`/ha and budget status) follow the selected view.
+  (placed, eco cost, `$`/ha and budget status) follow the selected view. The status bar reports
+  where each result came from (`paso 1 CSV` = published pattern, `tabú` = solved in the UI), and
+  the stats line shows the iterations/time of that run.
 
 ## Algorithm notes
 

@@ -61,3 +61,9 @@ def test_run_all_parsea_y_tiene_los_pasos():
     pos = [texto.index(s) for s in orden]
     assert pos == sorted(pos)
     assert "@('python\\validacion_exacta.py') + $ArgumentosValidacion" in texto
+
+
+def test_run_all_regenera_convergencia_antes_de_figuras_y_resumen():
+    t = (RAIZ / "run_all.ps1").read_text(encoding="utf-8")
+    i = t.index(r"python\convergencia.py")
+    assert i < t.index(r"python\figuras.py") < t.index(r"python\resumen.py")

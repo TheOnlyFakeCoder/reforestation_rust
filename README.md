@@ -23,7 +23,8 @@ python -m venv .venv
 | Ruta | Contenido |
 | --- | --- |
 | `src/` | Módulos del modelo en Rust: `config`, `datos`, `malla`, `competencia`, `objetivo`, `composicion`, `busqueda_tabu`, `paso1`, `escenarios`, `paso3`, `practica`, `reportes`; `src/bin/reto.rs` es el CLI |
-| `python/` | `comun.py`, `ajuste.py`, `paso2_compra.py`, `practica_compra.py`, `markov.py`, `figuras.py`, `resumen.py`, `validacion_exacta.py` y `tests/` |
+| `python/` | `comun.py`, `ajuste.py`, `paso2_compra.py`, `practica_compra.py`, `markov.py`, `figuras.py`, `resumen.py`, `validacion_exacta.py`, `transicion.py`, `entorno.py`, `tamano.py`, `experimentacion.py`, `sensibilidad.py`, `cambios.py` y `tests/` |
+| `run_all.ps1`, `pasos.ps1` | Pipeline completo; `pasos.ps1` define `Invoke-Paso` (corre y mide cada paso) |
 | `config/default.json` | Parámetros compartidos por Rust y Python (γ* = 3, ε = 0.1, π_factor = 2, tabú, semillas) |
 | `data/` | Datos del reto (los escribe `reto datos`) |
 | `results/` | CSV/JSON de cada paso y `RESUMEN.md` |
@@ -34,7 +35,7 @@ python -m venv .venv
 Todo en orden con `.\run_all.ps1`. Paso a paso, desde la raíz en PowerShell:
 
 ```powershell
-cargo build --release
+cargo build --release --bin reto
 $reto = ".\target\release\reto.exe"
 $py = ".venv\Scripts\python.exe"
 
@@ -45,8 +46,13 @@ $py = ".venv\Scripts\python.exe"
 & $reto paso1 --instancias todas --solo-gamma-star
 & $reto montecarlo --instancias todas
 & $py python\paso2_compra.py
-& $reto paso3 --instancias todas
-& $reto practica --instancias todas
+& $reto paso3 --instancias todas      # 1000 escenarios en 1ha y map_27, 100 en las demás
+& $reto practica --instancias todas   # incluye DSATUR sin y con existentes
+& $py python\transicion.py          # orden_plantacion_<inst>.csv, transicion.csv, transicion_estacionaria.csv
+& $py python\entorno.py             # entorno.json / entorno.md (PC, RAM, disco, versiones, commit)
+& $py python\tamano.py              # tamano_modelo.csv, tamano_parametros.csv, tamano_problema.csv
+& $py python\experimentacion.py     # experimentacion.csv (valores esperados por ha con IC 95 %)
+& $py python\sensibilidad.py        # results/sensibilidad/<variante>/ y sensibilidad.csv
 & $reto instancias-val              # results/validacion/inst_<id>.json
 & $reto tabu-val                    # results/validacion/tabu_<id>.csv (10 semillas)
 & $py python\validacion_exacta.py   # results/validacion_exacta.csv (CP-SAT)
@@ -56,7 +62,34 @@ $py = ".venv\Scripts\python.exe"
 & $py python\resumen.py
 ```
 
-`.\run_all.ps1 -OmitirValidacion` salta los tres pasos de la validación exacta. CP-SAT corre
+Después de actualizar el código (`git pull`) hay que recompilar `reto.exe`
+(`cargo build --release --bin reto`) antes de correr pasos sueltos; `run_all.ps1` lo hace como
+primer paso, salvo con `-SoloValidacion`.
+
+Opciones de `run_all.ps1`:
+
+- `-OmitirValidacion`: salta los tres pasos de la validación exacta.
+- `-OmitirSensibilidad`: salta `python\sensibilidad.py` (9 variantes de la cadena completa en
+  1ha y map_27, más el paso 1 en map_21).
+- `-SoloValidacion`: corre sólo `reto instancias-val`, `reto tabu-val` y
+  `python\validacion_exacta.py` (no compila).
+- `-ArgumentosValidacion @(...)`: argumentos para `python\validacion_exacta.py` (por defecto
+  ninguno), p. ej.
+  `.\run_all.ps1 -SoloValidacion -ArgumentosValidacion @('--formulaciones', 'ajustada', '--workers', '32', '--tiempo', '600', '--actualizar')`.
+
+Cada paso se mide con `Measure-Command` y se añade una fila a `results/tiempos.csv`
+(`paso, instancias, segundos, fecha`; `instancias` es el valor de `--instancias` o vacío). El
+archivo acumula las corridas y `RESUMEN.md` muestra la última de cada paso en
+"Entorno y software". `Invoke-Paso` vive en `pasos.ps1` (parámetro `-Tiempos` para otra ruta).
+
+Salidas nuevas de la entrega final: `entorno.json`/`entorno.md`, `tamano_*.csv`,
+`experimentacion.csv`, `orden_plantacion_<inst>.csv`, `paso3_transicion_<inst>.csv`,
+`transicion.csv`, `transicion_estacionaria.csv`, `sensibilidad.csv`, `tiempos.csv` y las figuras
+`orden_plantacion_<inst>.png` y `sensibilidad.png`. `RESUMEN.md` las reúne en las secciones
+"Entorno y software", "Tamaño del problema", "Experimentación (1000 simulaciones)", "Orden de
+plantación y transiciones" y "Sensibilidades".
+
+CP-SAT corre
 600 s por instancia con todos los hilos lógicos (`--workers`, por defecto `os.cpu_count()`) en la
 formulación básica y, si no prueba el óptimo, otros 600 s con la ajustada (10 instancias: hasta unas
 3.5 h). `python\validacion_exacta.py` acepta `--tiempo S`, `--workers N`, `--ids p3_a,p1_c`,
@@ -77,6 +110,10 @@ Los subcomandos de `reto` aceptan:
 - `--config RUTA`: archivo JSON de configuración (por defecto `config/default.json`).
 - `--set clave=valor`: sobrescribe un parámetro; se puede repetir. Ejemplo:
   `& $reto paso1 --instancias 1ha --set gamma_star=1 --set n_semillas=1`.
+  Al bajar `n_escenarios` hay que bajar también `n_escenarios_paso3` y vaciar
+  `escenarios_paso3_por_instancia` (la validación exige que los escenarios del paso 3 no pasen de
+  `n_escenarios`):
+  `--set n_escenarios=10 --set n_escenarios_paso3=5 --set "escenarios_paso3_por_instancia={}"`.
 - `--instancias LISTA`: `1ha`, `map_<id>` separados por comas, o `todas`
   (por defecto `1ha,map_27`).
 - `--solo-gamma-star` (sólo `paso1`): corre únicamente γ* en vez del barrido de γ.

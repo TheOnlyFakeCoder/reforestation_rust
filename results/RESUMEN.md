@@ -29,7 +29,7 @@ Software utilizado:
 | ortools | 9.15.6755 |
 | pytest | 9.1.1 |
 
-Tiempos de cómputo de la última corrida de cada paso (`run_all.ps1` los mide con `Measure-Command` y añade una fila por paso a `results/tiempos.csv`, que conserva todas las corridas). Suma: 1,927.9 s (0.54 h).
+Tiempos de cómputo de la última corrida de cada paso (`run_all.ps1` los mide con `Measure-Command` y añade una fila por paso a `results/tiempos.csv`, que conserva todas las corridas). Suma: 7,989.7 s (2.22 h).
 
 | paso | instancias | segundos | fecha |
 | --- | --- | --- | --- |
@@ -51,6 +51,10 @@ Tiempos de cómputo de la última corrida de cada paso (`run_all.ps1` los mide c
 | python python\practica_compra.py |  | 0.858 | 2026-10-22T00:28:09 |
 | python python\markov.py |  | 0.722 | 2026-10-22T00:28:10 |
 | python python\figuras.py |  | 5.636 | 2026-10-22T00:28:16 |
+| python python\resumen.py |  | 0.918 | 2026-10-22T00:28:17 |
+| reto instancias-val |  | 0.021 | 2026-10-22T02:17:35 |
+| reto tabu-val |  | 4.151 | 2026-10-22T02:17:39 |
+| python python\validacion_exacta.py --formulaciones ajustada --workers 32 --actualizar |  | 6056.732 | 2026-10-22T03:58:35 |
 
 ## Tamaño del problema
 
@@ -917,21 +921,21 @@ Leídos de `config/default.json`:
 
 ## Validación exacta
 
-Se corrió CP-SAT (OR-Tools) sobre 10 instancias pequeñas (7 del paso 3, ec. 24, y 3 del paso 1, ec. 21) con un límite de 600 s y 8 workers por formulación; ninguna se probó óptima en ese tiempo. En las 20 corridas CP-SAT arrancó con la mejor solución del tabú (de 10 semillas) como hint (`AddHint`). Primero se corrió la formulación básica y, donde no cerró, también la ajustada; la tabla tiene ambas filas. Los coeficientes enteros del modelo son round(γ·w·h·10 000) para los pares libre–libre; para los términos libre–fijo, el agregado por (v, j), (θ_j + γ·Σ w·h), redondeado una sola vez; y θ·10 000 en el paso 1. Z*, Z_TS y las brechas usan los coeficientes originales (error de redondeo máximo por coeficiente: 5.0e-05). Antes de comparar, el Z/objetivo de Python de cada solución del tabú se verificó contra el reportado por `tabu-val` de Rust, y el de cada solución de CP-SAT se reevaluó con `reto evaluar-val`; ambos coinciden a 1e-6.
+Se corrió CP-SAT (OR-Tools) sobre 10 instancias pequeñas (7 del paso 3, ec. 24, y 3 del paso 1, ec. 21) con un límite de 600 s y 8 workers en la básica y 32 en la ajustada; ninguna se probó óptima en ese tiempo. En las 20 corridas CP-SAT arrancó con la mejor solución del tabú (de 10 semillas) como hint (`AddHint`). Primero se corrió la formulación básica y, donde no cerró, también la ajustada; la tabla tiene ambas filas. Los coeficientes enteros del modelo son round(γ·w·h·10 000) para los pares libre–libre; para los términos libre–fijo, el agregado por (v, j), (θ_j + γ·Σ w·h), redondeado una sola vez; y θ·10 000 en el paso 1. Z*, Z_TS y las brechas usan los coeficientes originales (error de redondeo máximo por coeficiente: 5.0e-05). Antes de comparar, el Z/objetivo de Python de cada solución del tabú se verificó contra el reportado por `tabu-val` de Rust, y el de cada solución de CP-SAT se reevaluó con `reto evaluar-val`; ambos coinciden a 1e-6.
 
 Óptimo probado en 0 de 10 instancias (0 con la formulación básica y 0 con la ajustada).
 
-Sin óptimo probado: p1_a (cota 183.6430, incumbente 202.9292, ajustada), p1_b (cota 244.1465, incumbente 270.1126, ajustada), p1_c (cota 381.7119, incumbente 430.3189, ajustada), p3_a (cota 28.5206, incumbente 34.9464, ajustada), p3_b (cota 48.1291, incumbente 60.2890, ajustada), p3_c (cota 35.0971, incumbente 37.7158, ajustada), p3_d (cota 45.2391, incumbente 49.2267, ajustada), p3_e (cota 73.1512, incumbente 81.6954, ajustada), p3_f (cota 35.0029, incumbente 40.5758, ajustada), p3_g (cota 52.6801, incumbente 62.1755, ajustada). En ellas la brecha se mide contra la cota − tolerancia de redondeo (cota válida para el problema con coeficientes originales), así que es una cota superior de la brecha real; para cada instancia se toma la fila de óptimo probado o, si no la hay, la de mayor cota.
+Sin óptimo probado: p1_a (cota 187.5422, incumbente 202.9292, ajustada), p1_b (cota 246.1276, incumbente 270.1126, ajustada), p1_c (cota 384.1323, incumbente 430.3323, ajustada), p3_a (cota 28.9393, incumbente 34.9464, ajustada), p3_b (cota 48.2767, incumbente 60.2781, ajustada), p3_c (cota 35.9559, incumbente 37.7158, ajustada), p3_d (cota 45.8829, incumbente 49.2267, ajustada), p3_e (cota 74.9419, incumbente 81.7072, ajustada), p3_f (cota 36.5227, incumbente 40.5758, ajustada), p3_g (cota 54.6096, incumbente 62.1701, ajustada). En ellas la brecha se mide contra la cota − tolerancia de redondeo (cota válida para el problema con coeficientes originales), así que es una cota superior de la brecha real; para cada instancia se toma la fila de óptimo probado o, si no la hay, la de mayor cota.
 
-En esas filas la incumbente de CP-SAT queda entre 7.46 % y 25.3 % por encima de la cota, así que la brecha contra la cota está dominada por la debilidad de la cota más que por la calidad de las soluciones. La suma de los peores errores de redondeo por término en una solución (tolerancia del modelo escalado) es a lo más 0.031.
+En esas filas la incumbente de CP-SAT queda entre 4.89 % y 24.9 % por encima de la cota, así que la brecha contra la cota está dominada por la debilidad de la cota más que por la calidad de las soluciones. La suma de los peores errores de redondeo por término en una solución (tolerancia del modelo escalado) es a lo más 0.031.
 
-Brecha de la mejor semilla del tabú (contra el óptimo o la cota): máxima 25.4 % (p3_b), media 14.4 %. Brecha de la media de las semillas: máxima 27.2 %, media 14.8 %. Contra la incumbente de CP-SAT, la mejor semilla queda entre 0.00532 % y 0.0977 %.
+Brecha de la mejor semilla del tabú (contra el óptimo o la cota): máxima 25 % (p3_b), media 12.3 %. Brecha de la media de las semillas: máxima 26.8 %, media 12.6 %. Contra la incumbente de CP-SAT, la mejor semilla queda entre 0.00532 % y 0.106 %.
 
 La incumbente de CP-SAT mejora a la mejor semilla del tabú en 10 de 10 instancias (con los coeficientes originales).
 
 Fracción de semillas que alcanzan el valor de la incumbente (|Z_TS − Z*| ≤ 1e-6·max(1, Z*)) en las instancias sin óptimo probado, contra la incumbente de CP-SAT: p1_a: 0.0, p1_b: 0.0, p1_c: 0.0, p3_a: 0.0, p3_b: 0.0, p3_c: 0.0, p3_d: 0.0, p3_e: 0.0, p3_f: 0.0, p3_g: 0.0. En la tabla esta fracción sólo se muestra con óptimo probado (– si no): sin él no es significativa, porque en las filas básicas la incumbente puede ser la propia solución del hint del tabú.
 
-Paso 1: brecha_z = (γ·Z_TS − γ·Z*)/(γ·Z*), la competencia de la mejor semilla contra la de la incumbente de CP-SAT (no contra el óptimo): p1_a: 0.0103 %, p1_b: 0.0407 %, p1_c: 0.028 %. Especies con L_j < U_j (n_especies_libres): p1_a: 1, p1_b: 1, p1_c: 4. En p1_a, p1_b sólo hay una especie libre y Σ D_j = D_tot está fijo, así que la composición queda determinada y Σθ·D es constante: esas instancias validan sólo el acomodo.
+Paso 1: brecha_z = (γ·Z_TS − γ·Z*)/(γ·Z*), la competencia de la mejor semilla contra la de la incumbente de CP-SAT (no contra el óptimo): p1_a: 0.0103 %, p1_b: 0.0407 %, p1_c: 0.0221 %. Especies con L_j < U_j (n_especies_libres): p1_a: 1, p1_b: 1, p1_c: 4. En p1_a, p1_b sólo hay una especie libre y Σ D_j = D_tot está fijo, así que la composición queda determinada y Σθ·D es constante: esas instancias validan sólo el acomodo.
 
 ∞ (p3_b, basica): la cota es ≤ 0, así que la brecha relativa contra la cota no está acotada.
 
@@ -940,25 +944,25 @@ Tabla completa (`results/validacion_exacta.csv`; en el paso 1 los z son el objet
 | id | modelo | formulacion | n_pos | existentes | n_especies_libres | aristas | variables | z_opt | cota | optimo_probado | estado | tiempo_cpsat_s | z_ts_mejor | z_ts_media | z_ts_sd | tiempo_ts_medio_s | brecha_mejor_% | brecha_media_% | brecha_vs_incumbente_% | frac_semillas_optimo | z_comp_opt | z_comp_ts_mejor | brecha_z_% | error_redondeo_max |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | p1_a | paso1 | basica | 49 | 0 | 1 | 316 | 18814 | 202.9361 | 131.0323 | False | FEASIBLE | 600.1348 | 202.9399 | 203.461 | 0.4093 | 0.0391 | 54.9 | 55.3 | 0.00192 | – | 34.9487 | 34.95 | 0.00371 | 4.8e-05 |
-| p1_a | paso1 | ajustada | 49 | 0 | 1 | 316 | 32090 | 202.9292 | 183.643 | False | FEASIBLE | 600.3335 | 202.9399 | 203.461 | 0.4093 | 0.0391 | 10.5 | 10.8 | 0.00532 | – | 34.9464 | 34.95 | 0.0103 | 4.8e-05 |
+| p1_a | paso1 | ajustada | 49 | 0 | 1 | 316 | 32090 | 202.9292 | 187.5422 | False | FEASIBLE | 602.9547 | 202.9399 | 203.461 | 0.4093 | 0.0424 | 8.22 | 8.5 | 0.00532 | – | 34.9464 | 34.95 | 0.0103 | 4.8e-05 |
 | p1_b | paso1 | basica | 64 | 0 | 1 | 432 | 25473 | 270.1699 | 166.9491 | False | FEASIBLE | 600.1988 | 270.1699 | 270.5203 | 0.2354 | 0.0591 | 61.8 | 62.1 | 0 | – | 47.0016 | 47.0016 | 0 | 4.8e-05 |
-| p1_b | paso1 | ajustada | 64 | 0 | 1 | 432 | 43840 | 270.1126 | 244.1465 | False | FEASIBLE | 600.5754 | 270.1699 | 270.5203 | 0.2354 | 0.0591 | 10.7 | 10.8 | 0.0212 | – | 46.9825 | 47.0016 | 0.0407 | 4.8e-05 |
+| p1_b | paso1 | ajustada | 64 | 0 | 1 | 432 | 43840 | 270.1126 | 246.1276 | False | FEASIBLE | 603.377 | 270.1699 | 270.5203 | 0.2354 | 0.0647 | 9.78 | 9.92 | 0.0212 | – | 46.9825 | 47.0016 | 0.0407 | 4.8e-05 |
 | p1_c | paso1 | basica | 100 | 0 | 4 | 718 | 41803 | 430.3823 | 196.7282 | False | FEASIBLE | 600.4217 | 430.3823 | 431.738 | 0.8791 | 0.0596 | 119 | 119 | 0 | – | 75.4453 | 75.4453 | 0 | 4.8e-05 |
-| p1_c | paso1 | ajustada | 100 | 0 | 4 | 718 | 72800 | 430.3189 | 381.7119 | False | FEASIBLE | 601.4923 | 430.3823 | 431.738 | 0.8791 | 0.0596 | 12.8 | 13.1 | 0.0147 | – | 75.4242 | 75.4453 | 0.028 | 4.8e-05 |
+| p1_c | paso1 | ajustada | 100 | 0 | 4 | 718 | 72800 | 430.3323 | 384.1323 | False | FEASIBLE | 605.8781 | 430.3823 | 431.738 | 0.8791 | 0.064 | 12 | 12.4 | 0.0116 | – | 75.4286 | 75.4453 | 0.0221 | 4.8e-05 |
 | p3_a | paso3 | basica | 49 | 0 |  | 316 | 18814 | 34.957 | 0.0343 | False | FEASIBLE | 600.1773 | 34.9629 | 35.1711 | 0.1766 | 0.0285 | 1.79e+05 | 1.8e+05 | 0.0168 | – | 34.957 | 34.9629 | – | 4.9e-05 |
-| p3_a | paso3 | ajustada | 49 | 0 |  | 316 | 32090 | 34.9464 | 28.5206 | False | FEASIBLE | 600.305 | 34.9629 | 35.1711 | 0.1766 | 0.0285 | 22.7 | 23.4 | 0.0473 | – | 34.9464 | 34.9629 | – | 4.9e-05 |
+| p3_a | paso3 | ajustada | 49 | 0 |  | 316 | 32090 | 34.9464 | 28.9393 | False | FEASIBLE | 607.0669 | 34.9629 | 35.1711 | 0.1766 | 0.0323 | 20.9 | 21.6 | 0.0473 | – | 34.9464 | 34.9629 | – | 4.9e-05 |
 | p3_b | paso3 | basica | 81 | 0 |  | 566 | 33136 | 60.3187 | 0 | False | FEASIBLE | 600.222 | 60.3352 | 61.1635 | 0.4918 | 0.0357 | ∞ | ∞ | 0.0274 | – | 60.3187 | 60.3352 | – | 4.9e-05 |
-| p3_b | paso3 | ajustada | 81 | 0 |  | 566 | 57410 | 60.289 | 48.1291 | False | FEASIBLE | 600.712 | 60.3352 | 61.1635 | 0.4918 | 0.0357 | 25.4 | 27.2 | 0.0766 | – | 60.289 | 60.3352 | – | 4.9e-05 |
+| p3_b | paso3 | ajustada | 81 | 0 |  | 566 | 57410 | 60.2781 | 48.2767 | False | FEASIBLE | 607.0008 | 60.3352 | 61.1635 | 0.4918 | 0.0375 | 25 | 26.8 | 0.0948 | – | 60.2781 | 60.3352 | – | 4.9e-05 |
 | p3_c | paso3 | basica | 49 | 10 |  | 316 | 9066 | 37.7158 | 17.7101 | False | FEASIBLE | 600.105 | 37.7193 | 37.7841 | 0.0894 | 0.0265 | 113 | 113 | 0.00936 | – | 37.7158 | 37.7193 | – | 5.0e-05 |
-| p3_c | paso3 | ajustada | 49 | 10 |  | 316 | 16551 | 37.7158 | 35.0971 | False | FEASIBLE | 600.2546 | 37.7193 | 37.7841 | 0.0894 | 0.0265 | 7.5 | 7.69 | 0.00936 | – | 37.7158 | 37.7193 | – | 5.0e-05 |
+| p3_c | paso3 | ajustada | 49 | 10 |  | 316 | 16551 | 37.7158 | 35.9559 | False | FEASIBLE | 602.3865 | 37.7193 | 37.7841 | 0.0894 | 0.0277 | 4.94 | 5.12 | 0.00936 | – | 37.7158 | 37.7193 | – | 5.0e-05 |
 | p3_d | paso3 | basica | 64 | 13 |  | 432 | 16131 | 49.2329 | 20.4933 | False | FEASIBLE | 600.1281 | 49.2329 | 49.2756 | 0.0305 | 0.0265 | 140 | 141 | 0 | – | 49.2329 | 49.2329 | – | 5.0e-05 |
-| p3_d | paso3 | ajustada | 64 | 13 |  | 432 | 27810 | 49.2267 | 45.2391 | False | FEASIBLE | 600.5912 | 49.2329 | 49.2756 | 0.0305 | 0.0265 | 8.86 | 8.96 | 0.0127 | – | 49.2267 | 49.2329 | – | 5.0e-05 |
+| p3_d | paso3 | ajustada | 64 | 13 |  | 432 | 27810 | 49.2267 | 45.8829 | False | FEASIBLE | 603.9429 | 49.2329 | 49.2756 | 0.0305 | 0.0271 | 7.34 | 7.43 | 0.0127 | – | 49.2267 | 49.2329 | – | 5.0e-05 |
 | p3_e | paso3 | basica | 100 | 20 |  | 718 | 26342 | 81.7564 | 28.4522 | False | FEASIBLE | 600.2151 | 81.7573 | 81.8452 | 0.1908 | 0.042 | 188 | 188 | 0.00116 | – | 81.7564 | 81.7573 | – | 5.0e-05 |
-| p3_e | paso3 | ajustada | 100 | 20 |  | 718 | 46000 | 81.6954 | 73.1512 | False | FEASIBLE | 600.5266 | 81.7573 | 81.8452 | 0.1908 | 0.042 | 11.8 | 11.9 | 0.0758 | – | 81.6954 | 81.7573 | – | 5.0e-05 |
+| p3_e | paso3 | ajustada | 100 | 20 |  | 718 | 46000 | 81.7072 | 74.9419 | False | FEASIBLE | 606.52 | 81.7573 | 81.8452 | 0.1908 | 0.045 | 9.13 | 9.25 | 0.0614 | – | 81.7072 | 81.7573 | – | 5.0e-05 |
 | p3_f | paso3 | basica | 64 | 13 |  | 432 | 16131 | 40.5758 | 14.4278 | False | FEASIBLE | 600.1422 | 40.5789 | 40.601 | 0.0111 | 0.0326 | 182 | 182 | 0.00767 | – | 40.5758 | 40.5789 | – | 5.0e-05 |
-| p3_f | paso3 | ajustada | 64 | 13 |  | 432 | 27810 | 40.5758 | 35.0029 | False | FEASIBLE | 600.5146 | 40.5789 | 40.601 | 0.0111 | 0.0326 | 16 | 16 | 0.00767 | – | 40.5758 | 40.5789 | – | 5.0e-05 |
+| p3_f | paso3 | ajustada | 64 | 13 |  | 432 | 27810 | 40.5758 | 36.5227 | False | FEASIBLE | 603.8827 | 40.5789 | 40.601 | 0.0111 | 0.0348 | 11.2 | 11.2 | 0.00767 | – | 40.5758 | 40.5789 | – | 5.0e-05 |
 | p3_g | paso3 | basica | 100 | 20 |  | 718 | 26342 | 62.2312 | 20.8987 | False | FEASIBLE | 600.2433 | 62.2362 | 62.3842 | 0.2434 | 0.0348 | 198 | 199 | 0.00802 | – | 62.2312 | 62.2362 | – | 5.0e-05 |
-| p3_g | paso3 | ajustada | 100 | 20 |  | 718 | 46000 | 62.1755 | 52.6801 | False | FEASIBLE | 600.9307 | 62.2362 | 62.3842 | 0.2434 | 0.0348 | 18.2 | 18.5 | 0.0977 | – | 62.1755 | 62.2362 | – | 5.0e-05 |
+| p3_g | paso3 | ajustada | 100 | 20 |  | 718 | 46000 | 62.1701 | 54.6096 | False | FEASIBLE | 604.895 | 62.2362 | 62.3842 | 0.2434 | 0.0358 | 14 | 14.3 | 0.106 | – | 62.1701 | 62.2362 | – | 5.0e-05 |
 
 ## Notas de interpretación
 

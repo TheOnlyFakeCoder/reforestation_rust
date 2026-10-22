@@ -18,3 +18,6 @@ paso,instancias,segundos,fecha
 "python python\markov.py","",0.722,2026-10-22T00:28:10
 "python python\figuras.py","",5.636,2026-10-22T00:28:16
 "python python\resumen.py","",0.918,2026-10-22T00:28:17
+"reto instancias-val","",0.021,2026-10-22T02:17:35
+"reto tabu-val","",4.151,2026-10-22T02:17:39
+"python python\validacion_exacta.py --formulaciones ajustada --workers 32 --actualizar","",6056.732,2026-10-22T03:58:35

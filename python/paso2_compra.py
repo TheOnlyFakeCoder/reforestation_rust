@@ -45,8 +45,11 @@ def _solver():
     return pulp.PULP_CBC_CMD(msg=False)
 
 
-def resolver_ple(C, c, pi_factor, presupuesto=None, eta=0.0):
-    """PLE exacto; agrupa escenarios con el mismo C_j (equivale a la forma completa)."""
+def modelo_ple(C, c, pi_factor, presupuesto=None, eta=0.0):
+    """Construye el PLE (sin resolver); agrupa escenarios con el mismo C_j.
+
+    Devuelve (prob, q) con q la lista de variables enteras de compra.
+    """
     n = C.shape[0]
     prob = pulp.LpProblem("paso2", pulp.LpMinimize)
     q = [prob.add_variable(f"q{j}", lowBound=0, cat="Integer") for j in range(J)]
@@ -63,6 +66,12 @@ def resolver_ple(C, c, pi_factor, presupuesto=None, eta=0.0):
     prob += pulp.lpSum(float(c[j]) * q[j] for j in range(J)) + pulp.lpSum(pen) * (1.0 / n)
     if presupuesto is not None:
         prob += pulp.lpSum(float(c[j]) * q[j] for j in range(J)) <= presupuesto
+    return prob, q
+
+
+def resolver_ple(C, c, pi_factor, presupuesto=None, eta=0.0):
+    """PLE exacto; agrupa escenarios con el mismo C_j (equivale a la forma completa)."""
+    prob, q = modelo_ple(C, c, pi_factor, presupuesto=presupuesto, eta=eta)
     prob.solve(_solver())
     qv = np.array([int(round(v.value())) for v in q])
     return qv, float(pulp.value(prob.objective))

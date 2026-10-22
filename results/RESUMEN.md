@@ -7,8 +7,8 @@ Generado por `python/resumen.py` a partir de los CSV y JSON de `results/`.
 - Modelo de la PC: LENOVO 83DG
 - Sistema operativo: Microsoft Windows 11 Home Single Language (versión 10.0.26300)
 - Procesador: Intel(R) Core(TM) i9-14900HX (24 núcleos físicos, 32 hilos lógicos)
-- Memoria RAM: 31.7 GB (2 × 16 GB DDR5 a 5600 MHz)
-- Disco duro (C:): 826.4 GB totales, 238.5 GB libres, tipo SSD
+- Memoria RAM: 31.7 GiB (2 × 16 GiB DDR5 a 5600 MHz)
+- Disco duro (C:): 826.4 GiB totales, 238.5 GiB libres, tipo SSD
 - Commit del código: `5ac1a307cc4e13c3ed0b82ef7dd2fcdaf421acc5`
 
 Tamaños en GiB (2³⁰ bytes), de `entorno.json` (`python/entorno.py`).
@@ -65,20 +65,20 @@ Datos del problema (1 ha y P1): número de especies, plantas por hectárea (D_to
 | 1ha | 10 | 658 | 658 | 658 | 46 | 178 | 38 | 46 | 53 | 41 | 80 | 58 | 94 | 24 | 42 | 196 | 42 | 42 | 49 | 38 | 73 | 64 | 86 | 26 |
 | map_27 | 10 | 657.8125 | 842 | 842 | 59 | 226 | 49 | 59 | 69 | 52 | 102 | 74 | 121 | 31 | 54 | 251 | 54 | 54 | 63 | 48 | 93 | 82 | 110 | 33 |
 
-Variables y restricciones por modelo. La fila `extensivo_completo` es el modelo estocástico completo en forma extensiva (x, y del acomodo replicadas por cada uno de los |Ω| = 1000 escenarios más las variables del paso 2); su tamaño justifica resolverlo por pasos:
+Variables y restricciones por modelo. La fila `extensivo_completo` es el modelo estocástico completo en forma extensiva (x, y del acomodo replicadas por cada uno de los |Ω| = 1000 escenarios más las variables del paso 2); su tamaño justifica resolverlo por pasos. La columna `nota` dice qué cuenta `restricciones` en cada fila (tabú del paso 1: 10 definiciones D_j y 20 cotas L_j ≤ D_j ≤ U_j; paso 3: 10 cuotas; en el extensivo se suma 1 restricción de presupuesto):
 
 | instancia | modelo | variables | tipo_variables | restricciones | nota |
 | --- | --- | --- | --- | --- | --- |
-| 1ha | paso1_tabu | 658 | enteras en {0..10} | 30 | una variable por posición; cuotas L_j <= n_j <= U_j y composición como penalización/filtro de la búsqueda |
+| 1ha | paso1_tabu | 658 | enteras en {0..10} | 30 | una variable por posición (la asignación única va implícita en phi_u en {0..10}); restricciones: 10 definiciones D_j = suma_u [phi_u = j] y 20 cotas L_j <= D_j <= U_j, sin restricciones lineales en la búsqueda tabú en sí |
 | 1ha | paso1_lineal | 550880 | binarias | 1633588 | 10*\|V\| binarias x + 100*\|E\| y, \|V\|=658, \|E\|=5443; restricciones \|V\|+10+20+3*100*\|E\| |
 | 1ha | paso2_ple | 436 | 10 enteras q + 426 continuas f/e | 427 | conteos reales del modelo agrupado por valores distintos de C_j; la forma completa sin agrupar tiene 10 q + 2*10*\|Omega\| f/e (\|Omega\|=1000 en esta corrida) |
-| 1ha | paso3_por_escenario | 526 | enteras en {0..10} | 10 | posiciones libres \|V_lib\| del escenario omega=0; se resuelve una vez por cada uno de los \|Omega\|=1000 |
-| 1ha | extensivo_completo | 551450890 | binarias y enteras | 1635221589 | x, y del paso 1 + q (10) + por cada omega de \|Omega\|=1000: x_w, y_w del acomodo (10*\|V\|+100*\|E\|) y f_w, e_w (20); justifica la descomposición en pasos |
-| map_27 | paso1_tabu | 842 | enteras en {0..10} | 30 | una variable por posición; cuotas L_j <= n_j <= U_j y composición como penalización/filtro de la búsqueda |
+| 1ha | paso3_por_escenario | 526 | enteras en {0..10} | 10 | posiciones libres \|V_lib\| del escenario omega=0; restricciones: 10 cuotas n_j; se resuelve una vez por cada uno de los \|Omega\|=1000 |
+| 1ha | extensivo_completo | 551450890 | binarias y enteras | 1635221589 | restricciones: las del paso 1 + 1 restricción de presupuesto + por cada omega las del acomodo y de f_w, e_w; x, y del paso 1 + q (10) + por cada omega de \|Omega\|=1000: x_w, y_w del acomodo (10*\|V\|+100*\|E\|) y f_w, e_w (20); justifica la descomposición en pasos |
+| map_27 | paso1_tabu | 842 | enteras en {0..10} | 30 | una variable por posición (la asignación única va implícita en phi_u en {0..10}); restricciones: 10 definiciones D_j = suma_u [phi_u = j] y 20 cotas L_j <= D_j <= U_j, sin restricciones lineales en la búsqueda tabú en sí |
 | map_27 | paso1_lineal | 711620 | binarias | 2110472 | 10*\|V\| binarias x + 100*\|E\| y, \|V\|=842, \|E\|=7032; restricciones \|V\|+10+20+3*100*\|E\| |
 | map_27 | paso2_ple | 478 | 10 enteras q + 468 continuas f/e | 469 | conteos reales del modelo agrupado por valores distintos de C_j; la forma completa sin agrupar tiene 10 q + 2*10*\|Omega\| f/e (\|Omega\|=1000 en esta corrida) |
-| map_27 | paso3_por_escenario | 670 | enteras en {0..10} | 10 | posiciones libres \|V_lib\| del escenario omega=0; se resuelve una vez por cada uno de los \|Omega\|=1000 |
-| map_27 | extensivo_completo | 712351630 | binarias y enteras | 2112582473 | x, y del paso 1 + q (10) + por cada omega de \|Omega\|=1000: x_w, y_w del acomodo (10*\|V\|+100*\|E\|) y f_w, e_w (20); justifica la descomposición en pasos |
+| map_27 | paso3_por_escenario | 670 | enteras en {0..10} | 10 | posiciones libres \|V_lib\| del escenario omega=0; restricciones: 10 cuotas n_j; se resuelve una vez por cada uno de los \|Omega\|=1000 |
+| map_27 | extensivo_completo | 712351630 | binarias y enteras | 2112582473 | restricciones: las del paso 1 + 1 restricción de presupuesto + por cada omega las del acomodo y de f_w, e_w; x, y del paso 1 + q (10) + por cada omega de \|Omega\|=1000: x_w, y_w del acomodo (10*\|V\|+100*\|E\|) y f_w, e_w (20); justifica la descomposición en pasos |
 
 Parámetros (la fila TOTAL es la suma de la columna `cantidad`):
 
@@ -436,7 +436,7 @@ Comparación de π (1 ha y P1):
 
 Los escenarios caen en `presupuesto_corto` en 4900 de 4900 casos. El nombre es el de la especificación para Σn < |V_lib|; aquí no lo causa el presupuesto. Con π = 2c la razón crítica es 0.5, así que el modelo compra cerca de la mediana de C, y además la malla tiene posiciones de más (|V| > D_tot). Como el caso `usual` exige Σn = |V_lib|, no se alcanza si algún q_j < C_j o si |V| > D_tot.
 
-Huecos medios por hectárea, (V_lib − M)/A: entre 4.4 y 12.3 en las 31 instancias (12.3 en 1 ha, 10.8 en P1/map_27). Cada hueco se parte en faltante de compra (ΣC⁺ − M, que coincide con el `faltante_esperado` del paso 2 salvo por el número de escenarios: 100 aquí, 1000 allá) y excedente de malla (|V| − D_tot). El excedente de malla va de 0 a 8 posiciones.
+Huecos medios por hectárea, (V_lib − M)/A: entre 4.4 y 12.3 en las 31 instancias (12.3 en 1 ha, 10.8 en P1/map_27). Cada hueco se parte en faltante de compra (ΣC⁺ − M, que coincide con el `faltante_esperado` del paso 2 salvo por el número de escenarios: 1000 escenarios en 1ha, map_27; 100 escenarios en 29 instancias; donde ambos usan los mismos escenarios coinciden exactamente) y excedente de malla (|V| − D_tot). El excedente de malla va de 0 a 8 posiciones.
 
 El presupuesto no es activo con π = 2: la compra cabe en todas las instancias, con una holgura B·A − costo de $78 a $898. Es un hallazgo del modelo, no un error.
 
@@ -553,7 +553,7 @@ Distribución. `Z_por_planta` divide entre las plantas presentes (T + M), que en
 | map_27 | dsatur_sin_existentes | 842 | 842 | 986.6242 | 1.1718 | 1.1718 | 770.8001 | 295 | 400.5847 | 180.3535 | 362.87 | 10.6716 | 32.1444 | 0 |
 | map_27 | dsatur_con_existentes | 823 | 842 | 952.7232 | 1.1576 | 1.1315 | 744.315 | 264 | 342.1283 | 208.5082 | 360.0843 | 9.264 | 32.7385 | 0 |
 
-DSATUR por cuotas (§10): en 1ha, Z = 775.7 sin existentes y 771.4 con existentes, contra 569.0 y 561.1 del tabú y 749.5 (i) y 773.9 (iii) de la serpentina (con existentes, DSATUR queda +37.5 % frente al tabú); en map_27, Z = 986.6 sin existentes y 952.7 con existentes, contra 738.9 y 719.6 del tabú y 1032.9 (i) y 1000.2 (iii) de la serpentina (con existentes, DSATUR queda +32.4 % frente al tabú).
+DSATUR por cuotas (§10): en 1ha, Z = 775.7 sin existentes y 771.4 con existentes, contra 569.0 y 561.1 del tabú y 749.5 (i) y 773.9 (iii) de la serpentina (con existentes, DSATUR queda +37.5 % frente al tabú); en map_27, Z = 986.6 sin existentes y 952.7 con existentes, contra 738.9 y 719.6 del tabú y 1032.9 (i) y 1000.2 (iii) de la serpentina (con existentes, DSATUR queda +32.4 % frente al tabú). La regla voraz asigna en cada paso la especie más barata con cuota disponible, así que las especies de menor competencia cruzada se agotan primero y Agave salmiana (≈ 27 % de las plantas) queda para los últimos pasos, donde se forma la mayoría de los pares inmediatos de la misma especie (en 1 ha, salmiana se agota en el paso 657 de 658 y aporta 235 de los 254 pares de la misma especie).
 
 Markov. Titular: las filas `compra_d` (compra del paso 2, ε = 0.1) y `compra_nominal` (q = D̄) proyectan la supervivencia sobre las plantas realmente plantadas, E[min(q_j, C⁺_j)] sobre los escenarios. Las filas `D_completo` suponen plantar todo D sin plantas existentes, que ya sobrevivieron al establecimiento, y por eso sobrestiman las vivas y la reposición (entre 24 % y 28 % en la reposición de 1 ha). Las vivas a 1 año de `compra_d` en 1 ha coinciden con la opción d de `practica_compra.csv`.
 
@@ -815,7 +815,7 @@ Composición D* por variante:
 
 ## Convergencia del tabú
 
-Tope escalado por tamaño de la malla: max_iter_efectivo = max(max_iter, iter_por_posicion·|V|) y max_sin_mejora_efectivo = max(max_sin_mejora, sin_mejora_por_posicion·|V|). Criterio: al menos 90 % de las búsquedas tabú terminan por `sin_mejora` en total y 80 % en cada instancia. Se cumple: 3382 de 3382 búsquedas (100.0 %) y el mínimo por instancia es 100.0 %.
+Tope escalado por tamaño de la malla: max_iter_efectivo = max(max_iter, iter_por_posicion·|V|) y max_sin_mejora_efectivo = max(max_sin_mejora, sin_mejora_por_posicion·|V|). Criterio: al menos 90 % de las búsquedas tabú terminan por `sin_mejora` en total y 80 % en cada instancia. Se cumple: 5182 de 5182 búsquedas (100.0 %) y el mínimo por instancia es 100.0 %.
 
 ### Motivos de paro
 
@@ -823,8 +823,8 @@ Por instancia, sobre todas las búsquedas del pipeline:
 
 | instancia | busquedas | paros_tope | paros_sin_mejora | frac_sin_mejora |
 | --- | --- | --- | --- | --- |
-| 1ha | 154 | 0 | 154 | 1 |
-| map_27 | 154 | 0 | 154 | 1 |
+| 1ha | 1054 | 0 | 1054 | 1 |
+| map_27 | 1054 | 0 | 1054 | 1 |
 | map_28 | 106 | 0 | 106 | 1 |
 | map_30 | 106 | 0 | 106 | 1 |
 | map_20 | 106 | 0 | 106 | 1 |
@@ -854,7 +854,7 @@ Por instancia, sobre todas las búsquedas del pipeline:
 | map_4 | 106 | 0 | 106 | 1 |
 | map_5 | 106 | 0 | 106 | 1 |
 | map_1 | 106 | 0 | 106 | 1 |
-| total | 3382 | 0 | 3382 | 1 |
+| total | 5182 | 0 | 5182 | 1 |
 
 ### Corrida de referencia
 

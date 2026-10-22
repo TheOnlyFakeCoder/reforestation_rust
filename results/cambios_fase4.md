@@ -4,6 +4,8 @@ Antes: `be65ce0`. Después: `45c370f`.
 
 ## Cifras antes y después
 
+En la fila `reducción vs serpentina iii`, `antes` y `después` son porcentajes y `cambio_pct` es la diferencia en puntos porcentuales (después − antes), no un cambio relativo.
+
 | cifra | instancia | antes | despues | cambio_pct |
 | --- | --- | --- | --- | --- |
 | Z_opt paso 1 | 1ha | 577.3623 | 571.4363 | -1.0264 |
@@ -17,10 +19,10 @@ Antes: `be65ce0`. Después: `45c370f`.
 | Z media paso 3 | map_21 | 5061.0755 | 4938.289 | -2.4261 |
 | costo paso 2 | 1ha | 12422 | 12422 | 0 |
 | q paso 2 | 1ha | [38, 139, 30, 38, 43, 33, 65, 46, 78, 20] | [38, 140, 30, 38, 43, 33, 65, 46, 78, 19] |  |
-| reducción vs serpentina iii | 1ha | 26.5125 | 27.4984 | 3.7188 |
+| reducción vs serpentina iii | 1ha | 26.5125 | 27.4984 | 0.986 |
 | costo paso 2 | map_27 | 15892 | 15892 | 0 |
 | q paso 2 | map_27 | [49, 177, 39, 48, 56, 42, 83, 58, 100, 26] | [49, 177, 39, 49, 56, 42, 83, 58, 100, 25] |  |
-| reducción vs serpentina iii | map_27 | 26.9972 | 28.0504 | 3.901 |
+| reducción vs serpentina iii | map_27 | 26.9972 | 28.0504 | 1.0532 |
 
 ## Validación exacta (filas definitivas)
 

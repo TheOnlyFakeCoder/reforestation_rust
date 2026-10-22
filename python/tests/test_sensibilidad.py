@@ -92,28 +92,86 @@ def test_resumir_variante_sin_paso3(tmp_path):
     assert df[df.variante == "m_0"]["z_paso3_media"].isna().all()
 
 
-def test_reanuda_variante_hecha(tmp_path):
+def _fake_ok(llamadas):
+    def falso(cmd, **k):
+        llamadas.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+    return falso
+
+
+def _sin_paso2(monkeypatch):
+    monkeypatch.setattr(sensibilidad.paso2_compra, "correr", lambda resultados=None, salida=None: None)
+
+
+def test_reanuda_variante_hecha(tmp_path, monkeypatch):
+    _sin_paso2(monkeypatch)
     carpeta = tmp_path / "base"
-    _escribir(carpeta, 500.0, 600.0, 12000.0)
-    cfg = sensibilidad.config_variante(leer_config(), {})
-    (carpeta / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    sensibilidad.correr_variante("base", carpeta, Path("reto.exe"), ejecutar=_fake_ok([]),
+                                 mc_params=None)
 
     def falso(*a, **k):
         raise AssertionError("no debe ejecutarse")
-    sensibilidad.correr_variante("base", carpeta, Path("reto.exe"), ejecutar=falso)
+    sensibilidad.correr_variante("base", carpeta, Path("reto.exe"), ejecutar=falso, mc_params=None)
+
+
+def test_config_distinta_fuerza_rerun(tmp_path, monkeypatch):
+    _sin_paso2(monkeypatch)
+    carpeta = tmp_path / "base"
+    sensibilidad.correr_variante("base", carpeta, Path("reto.exe"), ejecutar=_fake_ok([]),
+                                 mc_params=None)
+    monkeypatch.setitem(sensibilidad.VARIANTES, "base", {"kappa": 0.9})
+    llamadas = []
+    sensibilidad.correr_variante("base", carpeta, Path("reto.exe"), ejecutar=_fake_ok(llamadas),
+                                 mc_params=None)
+    assert len(llamadas) == 5
+    assert json.loads((carpeta / "config.json").read_text())["kappa"] == 0.9
+
+
+def test_rerun_interrumpido_no_se_salta(tmp_path, monkeypatch):
+    _sin_paso2(monkeypatch)
+    carpeta = tmp_path / "base"
+    sensibilidad.correr_variante("base", carpeta, Path("reto.exe"), ejecutar=_fake_ok([]),
+                                 mc_params=None)
+    monkeypatch.setitem(sensibilidad.VARIANTES, "base", {"kappa": 0.9})
+    n = []
+
+    def cae(cmd, **k):
+        n.append(cmd)
+        if len(n) == 2:
+            raise RuntimeError("interrumpida")
+        return subprocess.CompletedProcess(cmd, 0)
+    with pytest.raises(RuntimeError):
+        sensibilidad.correr_variante("base", carpeta, Path("reto.exe"), ejecutar=cae, mc_params=None)
+    llamadas = []
+    sensibilidad.correr_variante("base", carpeta, Path("reto.exe"), ejecutar=_fake_ok(llamadas),
+                                 mc_params=None)
+    assert len(llamadas) == 5
 
 
 def test_correr_variante_ordena_los_pasos(tmp_path, monkeypatch):
     llamadas = []
     monkeypatch.setattr(sensibilidad.paso2_compra, "correr",
                         lambda resultados=None, salida=None: llamadas.append(("paso2", resultados)))
+    reto = []
+    carpeta = tmp_path / "kappa_0.4"
 
     def falso(cmd, **k):
         llamadas.append(cmd[1])
+        reto.append(cmd)
         return subprocess.CompletedProcess(cmd, 0)
-    carpeta = tmp_path / "kappa_0.4"
     sensibilidad.correr_variante("kappa_0.4", carpeta, Path("reto.exe"), ejecutar=falso,
                                  mc_params=None)
     assert [l if isinstance(l, str) else l[0] for l in llamadas] == [
         "malla", "paso1", "montecarlo", "paso2", "paso3", "practica"]
     assert json.loads((carpeta / "config.json").read_text())["kappa"] == 0.4
+    esperado = {"malla": None, "paso1": "1ha,map_27,map_21", "montecarlo": "1ha,map_27",
+                "paso3": "1ha,map_27", "practica": "1ha,map_27"}
+    for cmd in reto:
+        assert cmd[cmd.index("--config") + 1] == str(carpeta / "config.json")
+        assert cmd[cmd.index("--resultados") + 1] == str(carpeta)
+        sub = cmd[1]
+        if esperado[sub]:
+            assert cmd[cmd.index("--instancias") + 1] == esperado[sub]
+        else:
+            assert "--instancias" not in cmd
+    assert "--solo-gamma-star" in reto[1]

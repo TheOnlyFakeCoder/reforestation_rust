@@ -41,10 +41,12 @@ def config_variante(base, cambios):
     return cfg
 
 
+MARCA = "completa.json"  # copia de la config con la que terminó la cadena completa
+
+
 def _hecha(carpeta, cfg):
-    ruta = carpeta / "config.json"
-    if not (ruta.exists() and (carpeta / "paso3_resumen.csv").exists()
-            and (carpeta / "practica_distribucion.csv").exists()):
+    ruta = carpeta / MARCA
+    if not ruta.exists():
         return False
     try:
         return json.loads(ruta.read_text(encoding="utf-8")) == cfg
@@ -60,6 +62,7 @@ def correr_variante(nombre, carpeta, reto, ejecutar=subprocess.run,
         print(f"{nombre}: ya hecha, se omite")
         return
     carpeta.mkdir(parents=True, exist_ok=True)
+    (carpeta / MARCA).unlink(missing_ok=True)  # una corrida interrumpida no cuenta como hecha
     (carpeta / "config.json").write_text(json.dumps(cfg, indent=2), encoding="utf-8")
     if mc_params is not None:
         shutil.copy(mc_params, carpeta / "mc_params.json")
@@ -76,6 +79,7 @@ def correr_variante(nombre, carpeta, reto, ejecutar=subprocess.run,
     paso2_compra.correr(resultados=carpeta)
     reto_cmd("paso3", "--instancias", cadena)
     reto_cmd("practica", "--instancias", cadena)
+    (carpeta / MARCA).write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
 
 def _leer(carpeta, nombre):

@@ -56,3 +56,19 @@ def test_practica_distribucion_con_siete_variantes(tmp_path, monkeypatch):
     assert len(etiquetas) == 7
     assert any("DSATUR" in e for e in etiquetas)
     assert len(figs[0].axes[0].patches) == 7
+
+
+def test_orden_plantacion_con_datos_sinteticos(tmp_path):
+    import numpy as np
+    import pandas as pd
+    reg = []
+    for fila in range(8):
+        for col in range(10):
+            reg.append([len(reg), fila, col, 0.5 + col + (0.5 if fila % 2 else 0), 0.87 * fila,
+                        (fila + col) % 10, 1 if (fila, col) == (2, 3) else 0])
+    pd.DataFrame(reg, columns=["pos", "fila", "col", "x", "y", "especie", "existente"]).to_csv(
+        tmp_path / "paso3_patron_sint_omega0.csv", index=False)
+    salida = tmp_path / "fig"
+    figuras.main(["orden_plantacion"], instancias=["sint"], origen=tmp_path, salida=salida)
+    assert (salida / "orden_plantacion_sint.png").stat().st_size > 1000
+    assert "orden_plantacion" in figuras.FIGURAS

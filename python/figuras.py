@@ -170,6 +170,48 @@ def fig_mapa(inst, origen, salida):
     plt.close(fig)
 
 
+@figura("orden_plantacion")
+def fig_orden_plantacion(inst, origen, salida):
+    """Malla del patrón ω = 0 con los primeros 60 pasos de siembra numerados y unidos por una línea."""
+    ruta = origen / f"paso3_patron_{inst}_omega0.csv"
+    if not ruta.exists():
+        print(f"aviso: orden_plantacion_{inst} omitido, falta {ruta.name}")
+        return
+    try:
+        from transicion import orden_serpentina
+    except ImportError:
+        from python.transicion import orden_serpentina
+    d = pd.read_csv(ruta)
+    o = orden_serpentina(d)
+    cmap = plt.get_cmap("tab10")
+    nombres = _nombres_cortos()
+    fig, ax = plt.subplots(figsize=(10, 8))
+    vac = d[d["especie"] < 0]
+    ax.scatter(vac["x"], vac["y"], s=18, facecolors="none", edgecolors="#bbbbbb", lw=0.6)
+    for j in range(J):
+        sj = d[d["especie"] == j]
+        ax.scatter(sj[sj["existente"] == 0]["x"], sj[sj["existente"] == 0]["y"], s=75,
+                   color=cmap(j), lw=0)
+        ax.scatter(sj[sj["existente"] == 1]["x"], sj[sj["existente"] == 1]["y"], s=75,
+                   color=cmap(j), edgecolors="black", lw=1.6)
+    p = o.head(60)
+    ax.plot(p["x"], p["y"], color="black", lw=0.8, alpha=0.7)
+    for _, r in p.iterrows():
+        ax.annotate(str(int(r["paso"])), (r["x"], r["y"]), ha="center", va="center", fontsize=6,
+                    color="white", fontweight="bold")
+    ax.set_aspect("equal")
+    ax.invert_yaxis()
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("y (m)")
+    ax.set_title(f"Orden de plantación en serpentina, primeros {len(p)} pasos ({inst})")
+    asas = [plt.Line2D([], [], marker="o", ls="", color=cmap(j), label=nombres[j]) for j in range(J)]
+    asas.append(plt.Line2D([], [], marker="o", ls="", mfc="#999999", mec="black", mew=1.6,
+                           label="existente"))
+    ax.legend(handles=asas, loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=6, fontsize=8,
+              frameon=False)
+    _guardar(fig, salida / f"orden_plantacion_{inst}.png")
+
+
 @figura("practica_distribucion", por_instancia=False)
 def fig_practica_distribucion(origen, salida, instancias=None):
     d = pd.read_csv(origen / "practica_distribucion.csv")

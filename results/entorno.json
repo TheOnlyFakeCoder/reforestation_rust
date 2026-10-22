@@ -1,0 +1,37 @@
+{
+  "modelo_pc": "LENOVO 83DG",
+  "sistema_operativo": "Microsoft Windows 11 Home Single Language (versión 10.0.26300)",
+  "disco_total_gb": 826.4,
+  "disco_libre_gb": 238.5,
+  "tipo_disco": "SSD",
+  "ram_gb": 31.7,
+  "ram_modulos": [
+    {
+      "capacidad_gb": 16.0,
+      "tipo": "DDR5",
+      "velocidad_mhz": 5600
+    },
+    {
+      "capacidad_gb": 16.0,
+      "tipo": "DDR5",
+      "velocidad_mhz": 5600
+    }
+  ],
+  "procesador": "Intel(R) Core(TM) i9-14900HX",
+  "nucleos_fisicos": 24,
+  "hilos_logicos": 32,
+  "commit": "5ac1a307cc4e13c3ed0b82ef7dd2fcdaf421acc5",
+  "software": {
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "python": "3.12.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "pandas": "3.0.6",
+    "matplotlib": "3.11.2",
+    "pulp": "4.0.1",
+    "highspy": "1.15.1",
+    "ortools": "9.15.6755",
+    "pytest": "9.1.1"
+  }
+}

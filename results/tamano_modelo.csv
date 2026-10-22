@@ -1,0 +1,11 @@
+instancia,modelo,variables,tipo_variables,restricciones,nota
+1ha,paso1_tabu,658,enteras en {0..10},30,una variable por posición; cuotas L_j <= n_j <= U_j y composición como penalización/filtro de la búsqueda
+1ha,paso1_lineal,550880,binarias,1633588,"10*|V| binarias x + 100*|E| y, |V|=658, |E|=5443; restricciones |V|+10+20+3*100*|E|"
+1ha,paso2_ple,436,10 enteras q + 426 continuas f/e,427,conteos reales del modelo agrupado por valores distintos de C_j; la forma completa sin agrupar tiene 10 q + 2*10*|Omega| f/e (|Omega|=1000 en esta corrida)
+1ha,paso3_por_escenario,526,enteras en {0..10},10,posiciones libres |V_lib| del escenario omega=0; se resuelve una vez por cada uno de los |Omega|=1000
+1ha,extensivo_completo,551450890,binarias y enteras,1635221589,"x, y del paso 1 + q (10) + por cada omega de |Omega|=1000: x_w, y_w del acomodo (10*|V|+100*|E|) y f_w, e_w (20); justifica la descomposición en pasos"
+map_27,paso1_tabu,842,enteras en {0..10},30,una variable por posición; cuotas L_j <= n_j <= U_j y composición como penalización/filtro de la búsqueda
+map_27,paso1_lineal,711620,binarias,2110472,"10*|V| binarias x + 100*|E| y, |V|=842, |E|=7032; restricciones |V|+10+20+3*100*|E|"
+map_27,paso2_ple,478,10 enteras q + 468 continuas f/e,469,conteos reales del modelo agrupado por valores distintos de C_j; la forma completa sin agrupar tiene 10 q + 2*10*|Omega| f/e (|Omega|=1000 en esta corrida)
+map_27,paso3_por_escenario,670,enteras en {0..10},10,posiciones libres |V_lib| del escenario omega=0; se resuelve una vez por cada uno de los |Omega|=1000
+map_27,extensivo_completo,712351630,binarias y enteras,2112582473,"x, y del paso 1 + q (10) + por cada omega de |Omega|=1000: x_w, y_w del acomodo (10*|V|+100*|E|) y f_w, e_w (20); justifica la descomposición en pasos"

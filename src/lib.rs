@@ -8,6 +8,7 @@ pub mod competition;
 pub mod composicion;
 pub mod config;
 pub mod datos;
+pub mod dsatur;
 pub mod escenarios;
 pub mod formatting;
 pub mod hex_grid;

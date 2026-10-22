@@ -145,6 +145,16 @@ def brechas_paso3(o, cfg=None):
     return g.reset_index(drop=True)
 
 
+def _frase_escenarios(r):
+    """Escenarios del paso 3 por instancia, tomados de la columna `n` de paso3_resumen."""
+    partes = []
+    for n, g in r.groupby("n", sort=False):
+        nombres = (", ".join(map(str, g["instancia"])) if len(g) <= 4
+                   else f"{len(g)} instancias")
+        partes.append(f"{int(n)} escenarios en {nombres}")
+    return "; ".join(partes)
+
+
 def _paso3(o):
     r = _csv(o, "paso3_resumen.csv")
     b = brechas_paso3(o)
@@ -163,7 +173,8 @@ def _paso3(o):
         f"Huecos medios por hectárea, (V_lib − M)/A: entre {ph.min():.1f} y {ph.max():.1f} en las "
         f"{len(b)} instancias ({h1:.1f} en 1 ha, {h27:.1f} en P1/map_27). Cada hueco se parte en "
         "faltante de compra (ΣC⁺ − M, que coincide con el `faltante_esperado` del paso 2 salvo "
-        "por el número de escenarios: 100 aquí, 1000 allá) y excedente de malla (|V| − D_tot). "
+        f"por el número de escenarios: {_frase_escenarios(r)}; donde ambos usan los mismos "
+        "escenarios coinciden exactamente) y excedente de malla (|V| − D_tot). "
         f"El excedente de malla va de {int(b['excedente_malla'].min())} a "
         f"{int(b['excedente_malla'].max())} posiciones.\n\n"
         "El presupuesto no es activo con π = 2: la compra cabe en todas las instancias, con una "
@@ -446,7 +457,7 @@ def _entorno(o):
         r = json.loads(ruta.read_text(encoding="utf-8"))
         mods = {}
         for m in r.get("ram_modulos", []):
-            k = f"{_num(m.get('capacidad_gb'))} GB {m.get('tipo')} a {_num(m.get('velocidad_mhz'))} MHz"
+            k = f"{_num(m.get('capacidad_gb'))} GiB {m.get('tipo')} a {_num(m.get('velocidad_mhz'))} MHz"
             mods[k] = mods.get(k, 0) + 1
         ram = "; ".join(f"{n} × {k}" for k, n in mods.items()) or "módulos desconocidos"
         partes.append("\n".join([
@@ -454,9 +465,9 @@ def _entorno(o):
             f"- Sistema operativo: {r.get('sistema_operativo')}",
             f"- Procesador: {r.get('procesador')} ({_num(r.get('nucleos_fisicos'))} núcleos físicos, "
             f"{_num(r.get('hilos_logicos'))} hilos lógicos)",
-            f"- Memoria RAM: {_num(r.get('ram_gb'))} GB ({ram})",
-            f"- Disco duro (C:): {_num(r.get('disco_total_gb'))} GB totales, "
-            f"{_num(r.get('disco_libre_gb'))} GB libres, tipo {r.get('tipo_disco')}",
+            f"- Memoria RAM: {_num(r.get('ram_gb'))} GiB ({ram})",
+            f"- Disco duro (C:): {_num(r.get('disco_total_gb'))} GiB totales, "
+            f"{_num(r.get('disco_libre_gb'))} GiB libres, tipo {r.get('tipo_disco')}",
             f"- Commit del código: `{r.get('commit')}`",
         ]) + "\n\nTamaños en GiB (2³⁰ bytes), de `entorno.json` (`python/entorno.py`).")
         sw = pd.DataFrame(list(r.get("software", {}).items()), columns=["software", "versión"])
@@ -706,7 +717,14 @@ def _frase_dsatur(d):
                     f"{100 * (z['dsatur_con_existentes'] / z['tabu_con_existentes'] - 1):+.1f} % "
                     "frente al tabú)")
         partes.append(txt)
-    return ("DSATUR por cuotas (§10): " + "; ".join(partes) + ".") if partes else ""
+    if not partes:
+        return ""
+    expl = (" La regla voraz asigna en cada paso la especie más barata con cuota disponible, así "
+            "que las especies de menor competencia cruzada se agotan primero y Agave salmiana "
+            "(≈ 27 % de las plantas) queda para los últimos pasos, donde se forma la mayoría de los "
+            "pares inmediatos de la misma especie (en 1 ha, salmiana se agota en el paso 657 de 658 "
+            "y aporta 235 de los 254 pares de la misma especie).")
+    return "DSATUR por cuotas (§10): " + "; ".join(partes) + "." + expl
 
 
 def _pendiente(o=None):

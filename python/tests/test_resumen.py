@@ -255,7 +255,7 @@ def test_entorno_y_tiempos(tmp_path):
     _entorno_sintetico(tmp_path)
     t = resumen._entorno(tmp_path)
     for frase in ["ACME Laptop X", "Windows 11", "CPU Z", "24 núcleos físicos", "32 hilos",
-                  "DDR5", "5600 MHz", "16 GB", "953.2 GB", "SSD", "abc123def", "rustc 1.80.0",
+                  "DDR5", "5600 MHz", "16 GiB", "953.2 GiB", "SSD", "abc123def", "rustc 1.80.0",
                   "| pandas | 2.2.0 |"]:
         assert frase in t, frase
     # tiempos: la última corrida de cada paso
@@ -353,3 +353,22 @@ def test_frase_dsatur_tolera_filas_duplicadas():
         filas.append({"instancia": "1ha", "variante": var, "Z": z})
     t = resumen._frase_dsatur(pd.DataFrame(filas))
     assert "710.0" in t and "700.0" not in t  # se queda con la última fila
+
+
+def test_frase_escenarios_deriva_n_de_los_datos():
+    r = pd.DataFrame({"instancia": ["1ha", "map_27", "a", "b"], "n": [1000, 1000, 100, 100]})
+    t = resumen._frase_escenarios(r)
+    assert "1000 escenarios en 1ha, map_27" in t and "100 escenarios en a, b" in t
+    assert "100 aquí" not in t and "1000 allá" not in t
+    largo = pd.DataFrame({"instancia": list("abcdefg"), "n": [100] * 7})
+    assert "100 escenarios en 7 instancias" in resumen._frase_escenarios(largo)
+    uno = resumen._frase_escenarios(pd.DataFrame({"instancia": ["x"], "n": [50]}))
+    assert "50 escenarios en x" in uno
+
+
+def test_frase_dsatur_explica_el_resultado():
+    d = pd.DataFrame([{"instancia": "1ha", "variante": v, "Z": z} for v, z in
+                      (("tabu_con_existentes", 500.0), ("dsatur_con_existentes", 700.0))])
+    t = resumen._frase_dsatur(d)
+    assert "Agave salmiana" in t and "especie más barata con cuota" in t
+    assert "en 1 ha" in t and "657" in t and "235" in t and "254" in t

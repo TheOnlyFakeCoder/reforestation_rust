@@ -261,6 +261,30 @@ def fig_practica_distribucion(origen, salida, instancias=None):
     _guardar(fig, salida / "practica_distribucion.png")
 
 
+@figura("sensibilidad", por_instancia=False)
+def fig_sensibilidad(origen, salida, instancias=None):
+    d = pd.read_csv(origen / "sensibilidad.csv")
+    variantes = [v for v in dict.fromkeys(d["variante"]) if v != "base"]
+    insts = list(dict.fromkeys(d["instancia"]))
+    colores = ["#1b6ca8", "#d95f02", "#1b9e77", "#7570b3"]
+    fig, axs = plt.subplots(1, 2, figsize=(13, 4.8))
+    for ax, col, tit in [(axs[0], "cambio_z_opt_pct", "Paso 1: z_opt (medio)"),
+                         (axs[1], "cambio_z_paso3_pct", "Paso 3: Z medio")]:
+        ancho = 0.8 / len(insts)
+        x = np.arange(len(variantes))
+        for k, inst in enumerate(insts):
+            s = d[d["instancia"] == inst].set_index("variante").reindex(variantes)
+            ax.bar(x + k * ancho - 0.4 + ancho / 2, s[col], ancho, label=inst,
+                   color=colores[k % len(colores)])
+        ax.axhline(0, color="black", lw=0.8)
+        ax.set_xticks(x)
+        ax.set_xticklabels(variantes, rotation=35, ha="right", fontsize=8)
+        ax.set_ylabel("cambio frente a base (%)")
+        ax.set_title(tit)
+        ax.legend(fontsize=8)
+    _guardar(fig, salida / "sensibilidad.png")
+
+
 def main(nombres=None, instancias=None, origen=None, salida=None):
     origen = Path(origen or RAIZ / "results")
     salida = Path(salida or RAIZ / "figures")

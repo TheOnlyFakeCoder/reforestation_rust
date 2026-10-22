@@ -72,3 +72,19 @@ def test_orden_plantacion_con_datos_sinteticos(tmp_path):
     figuras.main(["orden_plantacion"], instancias=["sint"], origen=tmp_path, salida=salida)
     assert (salida / "orden_plantacion_sint.png").stat().st_size > 1000
     assert "orden_plantacion" in figuras.FIGURAS
+
+
+def test_sensibilidad_con_datos_sinteticos(tmp_path):
+    import pandas as pd
+    filas = []
+    for v in ["base", "kappa_0.4", "m_0"]:
+        for i in ["1ha", "map_27", "map_21"]:
+            filas.append({"variante": v, "instancia": i,
+                          "cambio_z_opt_pct": 0.0 if v == "base" else 5.0,
+                          "cambio_z_paso3_pct": float("nan") if i == "map_21" else
+                          (0.0 if v == "base" else -3.0)})
+    pd.DataFrame(filas).to_csv(tmp_path / "sensibilidad.csv", index=False)
+    salida = tmp_path / "fig"
+    figuras.main(["sensibilidad"], origen=tmp_path, salida=salida)
+    assert (salida / "sensibilidad.png").stat().st_size > 1000
+    assert figuras.FIGURAS["sensibilidad"][1] is False

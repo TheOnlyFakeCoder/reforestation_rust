@@ -509,7 +509,10 @@ def _tamano(o):
         partes.append("Variables y restricciones por modelo. La fila `extensivo_completo` es el "
                       "modelo estocástico completo en forma extensiva (x, y del acomodo replicadas "
                       "por cada uno de los |Ω| = 1000 escenarios más las variables del paso 2); su "
-                      "tamaño justifica resolverlo por pasos:\n\n"
+                      "tamaño justifica resolverlo por pasos. La columna `nota` dice qué cuenta "
+                      "`restricciones` en cada fila (tabú del paso 1: 10 definiciones D_j y 20 "
+                      "cotas L_j ≤ D_j ≤ U_j; paso 3: 10 cuotas; en el extensivo se suma 1 "
+                      "restricción de presupuesto):\n\n"
                       + tabla_md(_sin_barras(pd.read_csv(ruta))))
     else:
         partes.append(_falta("tamano_modelo.csv", "se escribe con `python/tamano.py`"))

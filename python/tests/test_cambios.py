@@ -63,3 +63,14 @@ def test_d_star_sin_cambio():
     f = t[t["cifra"] == "D* paso 1"].iloc[0]
     assert f["antes"] == f["despues"]
     assert f["antes"].startswith("[") and f["antes"].endswith("]")
+
+
+def test_reduccion_serpentina_cambia_en_puntos_porcentuales():
+    a, d = _dicts(z_iii=200.0, z_tabu=150.0)
+    d["practica_distribucion"].loc[d["practica_distribucion"]["variante"] == "tabu_con_existentes",
+                                   "Z"] = 148.0
+    t = cambios.tabla_cambios(a, d)
+    f = t[t["cifra"] == "reducción vs serpentina iii"].iloc[0]
+    assert f["antes"] == 25.0 and f["despues"] == 26.0
+    assert abs(f["cambio_pct"] - 1.0) < 1e-9  # puntos porcentuales, no cambio relativo (4 %)
+    assert "puntos porcentuales" in cambios.NOTA_PUNTOS

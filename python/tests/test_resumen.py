@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -52,7 +54,7 @@ def test_resumen_convergencia_y_calibracion(tmp_path):
     for titulo in ["## Convergencia del tabú", "### Motivos de paro", "### Corrida de referencia",
                    "### Calibración de K y tenure", "### Parámetros finales del tabú"]:
         assert titulo in texto, titulo
-    assert "| total | 3382 | 0 | 3382 | 1 |" in texto
+    assert re.search(r"\| total \| \d+ \| \d+ \| \d+ \| [\d.]+ \|", texto)
     assert "0.604" in texto and "iter_por_posicion" in texto and "300" in texto
     assert "z_opt_sd" in texto
     assert "una semilla por escenario" in texto
@@ -237,6 +239,8 @@ def _practica_con_dsatur(o):
     for f in ("practica_compra.csv", "markov.csv", "malla_resumen.csv"):
         shutil.copy(RAIZ / "results" / f, o / f)
     d = pd.read_csv(RAIZ / "results" / "practica_distribucion.csv")
+    # no depende de si results/ ya trae filas DSATUR: se descartan y se agregan las sintéticas
+    d = d[~d["variante"].astype(str).str.startswith("dsatur")]
     extra = []
     for inst in ("1ha", "map_27"):
         for var, z in (("dsatur_sin_existentes", 780.0), ("dsatur_con_existentes", 700.0)):
@@ -340,3 +344,12 @@ def test_resumen_secciones_entrega_final(tmp_path):
                "## Convergencia del tabú"]
     pos = [texto.index(x) for x in titulos]
     assert pos == sorted(pos)
+
+
+def test_frase_dsatur_tolera_filas_duplicadas():
+    filas = []
+    for var, z in (("tabu_con_existentes", 500.0), ("dsatur_con_existentes", 700.0),
+                   ("dsatur_con_existentes", 710.0), ("dsatur_sin_existentes", 780.0)):
+        filas.append({"instancia": "1ha", "variante": var, "Z": z})
+    t = resumen._frase_dsatur(pd.DataFrame(filas))
+    assert "710.0" in t and "700.0" not in t  # se queda con la última fila

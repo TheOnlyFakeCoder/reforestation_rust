@@ -691,7 +691,8 @@ def _hay_dsatur(o):
 def _frase_dsatur(d):
     partes = []
     for inst in INSTANCIAS:
-        z = d[d["instancia"] == inst].set_index("variante")["Z"]
+        z = (d[d["instancia"] == inst].drop_duplicates(["instancia", "variante"], keep="last")
+             .set_index("variante")["Z"])
         if "dsatur_con_existentes" not in z.index:
             continue
         g = z.get
